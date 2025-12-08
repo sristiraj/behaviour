@@ -1,6 +1,13 @@
 import React, { useState } from 'react';
-import { Database, Plus, RefreshCw, Settings2, X, Upload, FileCode, Globe, Server, Clock, Zap, Edit, Trash2, ArrowRightLeft, Braces, Code, Loader2, Copy, PauseCircle, PlayCircle, Linkedin, Twitter, Stethoscope, Cloud, Briefcase, GraduationCap, MessageSquare } from 'lucide-react';
+import { Database, Plus, RefreshCw, Settings2, X, Globe, Server, Clock, Zap, Edit, Trash2, ArrowRightLeft, Copy, PauseCircle, PlayCircle, Linkedin, Twitter, Stethoscope, Cloud, Briefcase, GraduationCap, MessageSquare, Loader2, FileCode } from 'lucide-react';
 import { Connector, ScheduleConfig } from '../types';
+import { RestApiForm } from './connectors/RestApiForm';
+import { OracleForm } from './connectors/OracleForm';
+import { GcsForm } from './connectors/GcsForm';
+import { LocalFileForm } from './connectors/LocalFileForm';
+import { LinkedInForm, TwitterForm } from './connectors/SocialConnectors';
+import { DoximityForm, VeevaForm, SalesforceForm } from './connectors/CrmConnectors';
+import { GoogleScholarForm, RepFeedbackForm } from './connectors/OtherConnectors';
 
 interface ConnectorsProps {
   connectors: Connector[];
@@ -19,64 +26,8 @@ export const Connectors: React.FC<ConnectorsProps> = ({ connectors, onAddConnect
   // Add Connector Form State
   const [name, setName] = useState('');
   const [type, setType] = useState<Connector['type']>('rest_api');
+  const [config, setConfig] = useState<Record<string, any>>({});
   
-  // Generic / REST Config
-  const [configEndpoint, setConfigEndpoint] = useState('');
-  const [restAuthType, setRestAuthType] = useState<'none' | 'pat' | 'jwt' | 'oauth2'>('none');
-  const [restToken, setRestToken] = useState('');
-  const [oauthClientId, setOauthClientId] = useState('');
-  const [oauthClientSecret, setOauthClientSecret] = useState('');
-  const [oauthTokenUrl, setOauthTokenUrl] = useState('');
-  const [oauthScopes, setOauthScopes] = useState('');
-  const [jsonSample, setJsonSample] = useState('');
-  
-  // Oracle Config
-  const [oracleMethod, setOracleMethod] = useState<'tns' | 'jdbc'>('tns');
-  const [oracleHost, setOracleHost] = useState('');
-  const [oraclePort, setOraclePort] = useState('1521');
-  const [oracleSid, setOracleSid] = useState('');
-  const [oracleUser, setOracleUser] = useState('');
-  const [oraclePass, setOraclePass] = useState('');
-  const [oracleJdbcUrl, setOracleJdbcUrl] = useState('');
-  const [oracleJar, setOracleJar] = useState<File | null>(null);
-  const [sqlQuery, setSqlQuery] = useState('');
-
-  // GCS Config
-  const [configBucket, setConfigBucket] = useState('');
-  const [gcsAuthType, setGcsAuthType] = useState<'system' | 'access_token' | 'service_account'>('system');
-  const [gcsToken, setGcsToken] = useState('');
-  
-  // Local File Config
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-
-  // Social Connectors Config
-  const [linkedinClientId, setLinkedinClientId] = useState('');
-  const [linkedinClientSecret, setLinkedinClientSecret] = useState('');
-  const [linkedinOrgId, setLinkedinOrgId] = useState('');
-  
-  const [twitterApiKey, setTwitterApiKey] = useState('');
-  const [twitterApiSecret, setTwitterApiSecret] = useState('');
-  const [twitterBearerToken, setTwitterBearerToken] = useState('');
-
-  // CRM Connectors Config
-  const [doximityClientId, setDoximityClientId] = useState('');
-  const [doximityClientSecret, setDoximityClientSecret] = useState('');
-
-  const [veevaUrl, setVeevaUrl] = useState('');
-  const [veevaUser, setVeevaUser] = useState('');
-  const [veevaPass, setVeevaPass] = useState('');
-  
-  const [sfInstanceUrl, setSfInstanceUrl] = useState('');
-  const [sfClientId, setSfClientId] = useState('');
-  const [sfClientSecret, setSfClientSecret] = useState('');
-  const [sfUser, setSfUser] = useState('');
-  const [sfPass, setSfPass] = useState(''); // Pass + Security Token
-
-  // New Connectors Config
-  const [scholarApiKey, setScholarApiKey] = useState('');
-  const [repFeedbackUrl, setRepFeedbackUrl] = useState('');
-  const [repFeedbackKey, setRepFeedbackKey] = useState('');
-
   // Schedule Modal State
   const [scheduleMode, setScheduleMode] = useState<'manual' | 'cron' | 'webhook'>('manual');
   const [scheduleCron, setScheduleCron] = useState('');
@@ -90,104 +41,15 @@ export const Connectors: React.FC<ConnectorsProps> = ({ connectors, onAddConnect
   const resetForm = () => {
     setName('');
     setType('rest_api');
-    setConfigEndpoint('');
-    setRestAuthType('none');
-    setRestToken('');
-    setOauthClientId('');
-    setOauthClientSecret('');
-    setOauthTokenUrl('');
-    setOauthScopes('');
-    setJsonSample('');
-    setOracleMethod('tns');
-    setOracleHost('');
-    setOraclePort('1521');
-    setOracleSid('');
-    setOracleUser('');
-    setOraclePass('');
-    setOracleJdbcUrl('');
-    setOracleJar(null);
-    setSqlQuery('');
-    setConfigBucket('');
-    setGcsAuthType('system');
-    setGcsToken('');
-    setSelectedFile(null);
-    setLinkedinClientId('');
-    setLinkedinClientSecret('');
-    setLinkedinOrgId('');
-    setTwitterApiKey('');
-    setTwitterApiSecret('');
-    setTwitterBearerToken('');
-    setDoximityClientId('');
-    setDoximityClientSecret('');
-    setVeevaUrl('');
-    setVeevaUser('');
-    setVeevaPass('');
-    setSfInstanceUrl('');
-    setSfClientId('');
-    setSfClientSecret('');
-    setSfUser('');
-    setSfPass('');
-    setScholarApiKey('');
-    setRepFeedbackUrl('');
-    setRepFeedbackKey('');
+    setConfig({});
     setEditingConnector(null);
   };
 
   const populateForm = (connector: Connector) => {
     setName(connector.name);
     setType(connector.type);
-    
-    const config = connector.config || {};
-
-    if (connector.type === 'rest_api') {
-        setConfigEndpoint(config.endpoint || '');
-        setRestAuthType(config.authType || 'none');
-        setRestToken(config.token || '');
-        setOauthClientId(config.clientId || '');
-        setOauthClientSecret(config.clientSecret || '');
-        setOauthTokenUrl(config.tokenUrl || '');
-        setOauthScopes(config.scopes || '');
-        setJsonSample(config.jsonSample || '');
-    } else if (connector.type === 'oracle') {
-        setOracleMethod(config.method || 'tns');
-        setOracleHost(config.host || '');
-        setOraclePort(config.port || '1521');
-        setOracleSid(config.service || '');
-        setOracleUser(config.username || '');
-        setOraclePass('');
-        setOracleJdbcUrl(config.jdbcUrl || '');
-        setSqlQuery(config.query || '');
-    } else if (connector.type === 'gcs') {
-        setConfigBucket(config.bucket || '');
-        setGcsAuthType(config.authType || 'system');
-        setGcsToken(config.accessToken || '');
-    } else if (connector.type === 'linkedin') {
-        setLinkedinClientId(config.clientId || '');
-        setLinkedinClientSecret(config.clientSecret || '');
-        setLinkedinOrgId(config.organizationId || '');
-    } else if (connector.type === 'twitter') {
-        setTwitterApiKey(config.apiKey || '');
-        setTwitterApiSecret(config.apiSecret || '');
-        setTwitterBearerToken(config.bearerToken || '');
-    } else if (connector.type === 'doximity') {
-        setDoximityClientId(config.clientId || '');
-        setDoximityClientSecret(config.clientSecret || '');
-    } else if (connector.type === 'veeva') {
-        setVeevaUrl(config.url || '');
-        setVeevaUser(config.username || '');
-        setVeevaPass('');
-    } else if (connector.type === 'salesforce') {
-        setSfInstanceUrl(config.instanceUrl || '');
-        setSfClientId(config.clientId || '');
-        setSfClientSecret(config.clientSecret || '');
-        setSfUser(config.username || '');
-        setSfPass('');
-    } else if (connector.type === 'google_scholar') {
-        setScholarApiKey(config.apiKey || '');
-    } else if (connector.type === 'rep_feedback') {
-        setRepFeedbackUrl(config.url || '');
-        setRepFeedbackKey(config.apiKey || '');
-    }
+    // Clone config to avoid mutation references
+    setConfig({ ...connector.config } || {});
   };
 
   const handleAddNew = () => {
@@ -307,101 +169,32 @@ export const Connectors: React.FC<ConnectorsProps> = ({ connectors, onAddConnect
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     
-    let config: Record<string, any> = { };
+    // Prepare final config object
+    let finalConfig = { ...config };
 
-    if (type === 'gcs') {
-        config = { 
-            bucket: configBucket,
-            authType: gcsAuthType,
-            ...(gcsAuthType === 'access_token' ? { accessToken: gcsToken } : {}),
-            ...(gcsAuthType === 'service_account' ? { serviceAccountKey: '*****' } : {}),
+    // Handle Local File specific logic (metadata generation)
+    if (type === 'local_file' && config.selectedFile) {
+        finalConfig = {
+            ...finalConfig,
+            fileName: config.selectedFile.name,
+            fileSize: config.selectedFile.size,
+            uploadDate: new Date().toISOString(),
+            // In a real app, we'd upload the file here and store the URL/Path
+            // Here we just store the metadata
         };
-    } else if (type === 'local_file') {
-        if (selectedFile) {
-            config = { 
-                fileName: selectedFile.name,
-                fileSize: selectedFile.size,
-                uploadDate: new Date().toISOString()
-            };
-        } else if (editingConnector && editingConnector.type === 'local_file') {
-            config = { ...editingConnector.config };
-        }
-    } else if (type === 'oracle') {
-        config = {
-            method: oracleMethod,
-            username: oracleUser,
-            authType: 'password',
-            query: sqlQuery
-        };
-        if (oraclePass) config.password = oraclePass;
-
-        if (oracleMethod === 'tns') {
-            config.host = oracleHost;
-            config.port = oraclePort;
-            config.service = oracleSid;
-        } else {
-            config.jdbcUrl = oracleJdbcUrl;
-            config.driverJar = oracleJar ? oracleJar.name : (editingConnector?.config.driverJar || 'ojdbc8.jar (Bundled)');
-        }
-    } else if (type === 'rest_api') {
-        config = { 
-            endpoint: configEndpoint,
-            authType: restAuthType,
-            jsonSample: jsonSample
-        };
-        if (restAuthType === 'pat' || restAuthType === 'jwt') {
-            config.token = restToken;
-        } else if (restAuthType === 'oauth2') {
-            config.clientId = oauthClientId;
-            config.clientSecret = oauthClientSecret ? '*****' : (editingConnector?.config.clientSecret || '');
-            config.tokenUrl = oauthTokenUrl;
-            config.scopes = oauthScopes;
-        }
-    } else if (type === 'linkedin') {
-        config = {
-            clientId: linkedinClientId,
-            clientSecret: linkedinClientSecret ? '*****' : (editingConnector?.config.clientSecret || ''),
-            organizationId: linkedinOrgId
-        };
-    } else if (type === 'twitter') {
-        config = {
-            apiKey: twitterApiKey,
-            apiSecret: twitterApiSecret ? '*****' : (editingConnector?.config.apiSecret || ''),
-            bearerToken: twitterBearerToken ? '*****' : (editingConnector?.config.bearerToken || '')
-        };
-    } else if (type === 'doximity') {
-        config = {
-            clientId: doximityClientId,
-            clientSecret: doximityClientSecret ? '*****' : (editingConnector?.config.clientSecret || '')
-        };
-    } else if (type === 'veeva') {
-        config = {
-            url: veevaUrl,
-            username: veevaUser
-        };
-        if (veevaPass) config.password = veevaPass;
-    } else if (type === 'salesforce') {
-        config = {
-            instanceUrl: sfInstanceUrl,
-            clientId: sfClientId,
-            clientSecret: sfClientSecret ? '*****' : (editingConnector?.config.clientSecret || ''),
-            username: sfUser
-        };
-        if (sfPass) config.password = sfPass;
-    } else if (type === 'google_scholar') {
-        config = {
-            apiKey: scholarApiKey
-        };
-    } else if (type === 'rep_feedback') {
-        config = {
-            url: repFeedbackUrl,
-            apiKey: repFeedbackKey ? '*****' : (editingConnector?.config.apiKey || '')
+    }
+    
+    // Handle Oracle JAR logic
+    if (type === 'oracle' && config.driverJarFile) {
+        finalConfig = {
+             ...finalConfig,
+             driverJar: config.driverJarFile.name
         };
     }
 
-    // Preserve existing mapping if any (handled in Data Model UI)
+    // Preserve existing mapping if editing
     if (editingConnector && editingConnector.config.mapping) {
-        config.mapping = editingConnector.config.mapping;
+        finalConfig.mapping = editingConnector.config.mapping;
     }
 
     if (editingConnector && onUpdateConnector) {
@@ -409,7 +202,7 @@ export const Connectors: React.FC<ConnectorsProps> = ({ connectors, onAddConnect
             ...editingConnector,
             name,
             type,
-            config: { ...editingConnector.config, ...config },
+            config: finalConfig,
         };
         onUpdateConnector(updatedConnector);
     } else {
@@ -420,7 +213,7 @@ export const Connectors: React.FC<ConnectorsProps> = ({ connectors, onAddConnect
             status: 'idle',
             last_run: 'Never',
             row_count: 0,
-            config,
+            config: finalConfig,
             schedule: { mode: 'manual' }
         };
         onAddConnector(newConnector);
@@ -442,18 +235,6 @@ export const Connectors: React.FC<ConnectorsProps> = ({ connectors, onAddConnect
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
-    }
-  };
-
-  const handleJarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setOracleJar(e.target.files[0]);
-    }
-  };
-
   const getIconForType = (type: string) => {
       switch(type) {
           case 'oracle': return Database;
@@ -467,6 +248,23 @@ export const Connectors: React.FC<ConnectorsProps> = ({ connectors, onAddConnect
           case 'google_scholar': return GraduationCap;
           case 'rep_feedback': return MessageSquare;
           default: return Globe;
+      }
+  };
+
+  const renderConfigForm = () => {
+      switch(type) {
+          case 'rest_api': return <RestApiForm config={config} onChange={setConfig} />;
+          case 'oracle': return <OracleForm config={config} onChange={setConfig} />;
+          case 'gcs': return <GcsForm config={config} onChange={setConfig} />;
+          case 'local_file': return <LocalFileForm config={config} onChange={setConfig} />;
+          case 'linkedin': return <LinkedInForm config={config} onChange={setConfig} />;
+          case 'twitter': return <TwitterForm config={config} onChange={setConfig} />;
+          case 'doximity': return <DoximityForm config={config} onChange={setConfig} />;
+          case 'veeva': return <VeevaForm config={config} onChange={setConfig} />;
+          case 'salesforce': return <SalesforceForm config={config} onChange={setConfig} />;
+          case 'google_scholar': return <GoogleScholarForm config={config} onChange={setConfig} />;
+          case 'rep_feedback': return <RepFeedbackForm config={config} onChange={setConfig} />;
+          default: return <div className="p-4 text-slate-500 italic">Configuration not available for this type.</div>;
       }
   };
 
@@ -700,322 +498,9 @@ export const Connectors: React.FC<ConnectorsProps> = ({ connectors, onAddConnect
                         </div>
                     </div>
 
-                    {type === 'rest_api' && (
-                    <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1.5">API Endpoint</label>
-                            <div className="relative">
-                                <Globe className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-                                <input 
-                                    required
-                                    type="text" 
-                                    value={configEndpoint}
-                                    onChange={(e) => setConfigEndpoint(e.target.value)}
-                                    placeholder="https://api.example.com/v1"
-                                    className="w-full pl-10 pr-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                    )}
-                    
-                    {type === 'oracle' && (
-                        /* Standard Oracle Fields */
-                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Connection Method</label>
-                                <div className="flex bg-slate-100/50 p-1 rounded-xl">
-                                    <button 
-                                        type="button"
-                                        onClick={() => setOracleMethod('tns')}
-                                        className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${oracleMethod === 'tns' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
-                                    >
-                                        TNS (Host/Port/Service)
-                                    </button>
-                                    <button 
-                                        type="button"
-                                        onClick={() => setOracleMethod('jdbc')}
-                                        className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${oracleMethod === 'jdbc' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
-                                    >
-                                        JDBC URL
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="col-span-2">
-                                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Host</label>
-                                    <input required type="text" value={oracleHost} onChange={(e) => setOracleHost(e.target.value)} placeholder="oracle.example.com" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Port</label>
-                                    <input required type="text" value={oraclePort} onChange={(e) => setOraclePort(e.target.value)} placeholder="1521" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Service Name</label>
-                                    <input required type="text" value={oracleSid} onChange={(e) => setOracleSid(e.target.value)} placeholder="ORCL" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                    
-                    {type === 'local_file' && (
-                        <div className="animate-in fade-in slide-in-from-top-2">
-                           {/* File Upload UI */}
-                           <label className="block text-sm font-semibold text-slate-700 mb-1.5">Upload File</label>
-                           <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-slate-300 border-dashed rounded-xl hover:border-blue-400 transition-colors cursor-pointer bg-white/30 hover:bg-white/50 relative group">
-                                <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={handleFileChange} accept=".csv,.json,.parquet" />
-                                <div className="space-y-1 text-center">
-                                    {selectedFile ? (
-                                        <div className="flex flex-col items-center">
-                                            <FileCode className="mx-auto h-12 w-12 text-blue-500 mb-2" />
-                                            <p className="text-sm text-slate-900 font-medium">{selectedFile.name}</p>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <Upload className="mx-auto h-12 w-12 text-slate-400 group-hover:text-blue-500 transition-colors" />
-                                            <div className="flex text-sm text-slate-600 justify-center"><span className="font-medium text-blue-600 hover:text-blue-500">Upload a file</span></div>
-                                        </>
-                                    )}
-                                </div>
-                           </div>
-                        </div>
-                    )}
+                    {/* Dynamic Configuration Form */}
+                    {renderConfigForm()}
 
-                    {/* LinkedIn Config */}
-                    {type === 'linkedin' && (
-                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                             <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 mb-4 flex items-start">
-                                 <Linkedin className="w-5 h-5 text-blue-700 mr-3 mt-0.5" />
-                                 <div className="text-sm text-blue-900">
-                                     <p className="font-bold">LinkedIn API Access</p>
-                                     <p className="text-xs mt-1">Requires a developer application with the 'Marketing Developer Platform' product enabled.</p>
-                                 </div>
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Client ID</label>
-                                 <input required type="text" value={linkedinClientId} onChange={(e) => setLinkedinClientId(e.target.value)} className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Client Secret</label>
-                                 <input required type="password" value={linkedinClientSecret} onChange={(e) => setLinkedinClientSecret(e.target.value)} placeholder="••••••••" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Organization ID (Optional)</label>
-                                 <input type="text" value={linkedinOrgId} onChange={(e) => setLinkedinOrgId(e.target.value)} placeholder="e.g. 12345678" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
-                             </div>
-                        </div>
-                    )}
-
-                    {/* Twitter Config */}
-                    {type === 'twitter' && (
-                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                             <div className="bg-slate-100/50 p-4 rounded-xl border border-slate-200 mb-4 flex items-start">
-                                 <Twitter className="w-5 h-5 text-slate-700 mr-3 mt-0.5" />
-                                 <div className="text-sm text-slate-900">
-                                     <p className="font-bold">X (Twitter) API Access</p>
-                                     <p className="text-xs mt-1 text-slate-500">Requires Essential or Elevated access to the Twitter API v2.</p>
-                                 </div>
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">API Key</label>
-                                 <input required type="text" value={twitterApiKey} onChange={(e) => setTwitterApiKey(e.target.value)} className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">API Secret</label>
-                                 <input required type="password" value={twitterApiSecret} onChange={(e) => setTwitterApiSecret(e.target.value)} placeholder="••••••••" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Bearer Token (Optional)</label>
-                                 <input type="password" value={twitterBearerToken} onChange={(e) => setTwitterBearerToken(e.target.value)} placeholder="AAAA..." className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
-                             </div>
-                        </div>
-                    )}
-
-                    {/* Doximity Config */}
-                    {type === 'doximity' && (
-                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                             <div className="bg-orange-50/50 p-4 rounded-xl border border-orange-100 mb-4 flex items-start">
-                                 <Stethoscope className="w-5 h-5 text-orange-600 mr-3 mt-0.5" />
-                                 <div className="text-sm text-orange-900">
-                                     <p className="font-bold">Doximity Professional Network</p>
-                                     <p className="text-xs mt-1">Connect to Doximity APIs for HCP verification and network data.</p>
-                                 </div>
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Client ID</label>
-                                 <input required type="text" value={doximityClientId} onChange={(e) => setDoximityClientId(e.target.value)} className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Client Secret</label>
-                                 <input required type="password" value={doximityClientSecret} onChange={(e) => setDoximityClientSecret(e.target.value)} placeholder="••••••••" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
-                             </div>
-                        </div>
-                    )}
-
-                    {/* Veeva Config */}
-                    {type === 'veeva' && (
-                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                             <div className="bg-orange-50/50 p-4 rounded-xl border border-orange-100 mb-4 flex items-start">
-                                 <Briefcase className="w-5 h-5 text-orange-600 mr-3 mt-0.5" />
-                                 <div className="text-sm text-orange-900">
-                                     <p className="font-bold">Veeva CRM / Vault</p>
-                                     <p className="text-xs mt-1">Extract Call Notes, Rep Interactions, and Suggestions via Vault API.</p>
-                                 </div>
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Vault Domain URL</label>
-                                 <input required type="text" value={veevaUrl} onChange={(e) => setVeevaUrl(e.target.value)} placeholder="https://myvault.veevavault.com" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Username</label>
-                                 <input required type="text" value={veevaUser} onChange={(e) => setVeevaUser(e.target.value)} placeholder="user@company.com" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Password</label>
-                                 <input required type="password" value={veevaPass} onChange={(e) => setVeevaPass(e.target.value)} placeholder="••••••••" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
-                             </div>
-                        </div>
-                    )}
-
-                    {/* Salesforce Config */}
-                    {type === 'salesforce' && (
-                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                             <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 mb-4 flex items-start">
-                                 <Cloud className="w-5 h-5 text-blue-600 mr-3 mt-0.5" />
-                                 <div className="text-sm text-blue-900">
-                                     <p className="font-bold">Salesforce CRM</p>
-                                     <p className="text-xs mt-1">Integration via Connected App (Username-Password Flow for backend sync).</p>
-                                 </div>
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Instance URL</label>
-                                 <input required type="text" value={sfInstanceUrl} onChange={(e) => setSfInstanceUrl(e.target.value)} placeholder="https://na1.salesforce.com" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
-                             </div>
-                             <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Client ID (Consumer Key)</label>
-                                    <input required type="text" value={sfClientId} onChange={(e) => setSfClientId(e.target.value)} className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Client Secret</label>
-                                    <input required type="password" value={sfClientSecret} onChange={(e) => setSfClientSecret(e.target.value)} placeholder="••••••••" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
-                                </div>
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Salesforce Username</label>
-                                 <input required type="text" value={sfUser} onChange={(e) => setSfUser(e.target.value)} placeholder="user@domain.com" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Password + Security Token</label>
-                                 <input required type="password" value={sfPass} onChange={(e) => setSfPass(e.target.value)} placeholder="pass123TOKENxyz..." className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
-                             </div>
-                        </div>
-                    )}
-                    
-                    {/* Google Scholar Config */}
-                    {type === 'google_scholar' && (
-                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                             <div className="bg-slate-100/50 p-4 rounded-xl border border-slate-200 mb-4 flex items-start">
-                                 <GraduationCap className="w-5 h-5 text-slate-700 mr-3 mt-0.5" />
-                                 <div className="text-sm text-slate-900">
-                                     <p className="font-bold">Google Scholar (via API Wrapper)</p>
-                                     <p className="text-xs mt-1">Connects to services like SerpApi or custom scrapers to fetch publication metadata.</p>
-                                 </div>
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">API Key</label>
-                                 <input required type="text" value={scholarApiKey} onChange={(e) => setScholarApiKey(e.target.value)} placeholder="e.g. SerpApi Key" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
-                             </div>
-                        </div>
-                    )}
-
-                    {/* Rep Feedback Config */}
-                    {type === 'rep_feedback' && (
-                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                             <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100 mb-4 flex items-start">
-                                 <MessageSquare className="w-5 h-5 text-emerald-600 mr-3 mt-0.5" />
-                                 <div className="text-sm text-emerald-900">
-                                     <p className="font-bold">Rep Feedback Aggregator</p>
-                                     <p className="text-xs mt-1">Ingest structured feedback from field surveys, voice-of-customer tools, or internal databases.</p>
-                                 </div>
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Source Endpoint URL</label>
-                                 <input required type="text" value={repFeedbackUrl} onChange={(e) => setRepFeedbackUrl(e.target.value)} placeholder="https://internal.pharma.com/api/feedback" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Auth Token / API Key</label>
-                                 <input required type="password" value={repFeedbackKey} onChange={(e) => setRepFeedbackKey(e.target.value)} placeholder="••••••••" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
-                             </div>
-                        </div>
-                    )}
-
-                </div>
-
-                {/* Source Definition Section */}
-                <div className="space-y-5 pt-2">
-                    <div className="flex items-center space-x-2 text-slate-800 font-bold text-sm uppercase tracking-wide border-b border-slate-200/50 pb-1">
-                        <ArrowRightLeft className="w-4 h-4 text-purple-500" />
-                        <span>Source Definition</span>
-                    </div>
-
-                    {/* SQL Query Editor (Oracle) */}
-                    {type === 'oracle' && (
-                        <div className="animate-in fade-in slide-in-from-top-2">
-                            <label className="block text-sm font-semibold text-slate-700 mb-1.5 flex justify-between">
-                                <span>SQL Extraction Query</span>
-                                <span className="text-xs font-normal text-slate-500">Defines columns available for mapping</span>
-                            </label>
-                            <div className="relative">
-                                <Code className="absolute top-3 left-3 w-4 h-4 text-slate-400" />
-                                <textarea 
-                                    rows={4}
-                                    value={sqlQuery}
-                                    onChange={(e) => setSqlQuery(e.target.value)}
-                                    placeholder="SELECT npi_num, first_name, specialty FROM hcp_master"
-                                    className="w-full pl-10 pr-4 py-3 bg-slate-900 text-slate-200 border border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none font-mono text-xs leading-relaxed"
-                                ></textarea>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* REST Response Sample */}
-                    {type === 'rest_api' && (
-                        <div className="animate-in fade-in slide-in-from-top-2">
-                            <label className="block text-sm font-semibold text-slate-700 mb-1.5 flex justify-between">
-                                <span>Response JSON Sample</span>
-                                <span className="text-xs font-normal text-slate-500">Paste a sample response to guide mapping</span>
-                            </label>
-                            <div className="relative">
-                                <Braces className="absolute top-3 left-3 w-4 h-4 text-slate-400" />
-                                <textarea 
-                                    rows={6}
-                                    value={jsonSample}
-                                    onChange={(e) => setJsonSample(e.target.value)}
-                                    placeholder='{ "results": [ { "id": "123", "name": "Dr. Smith" } ] }'
-                                    className="w-full pl-10 pr-4 py-3 bg-slate-900 text-slate-200 border border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none font-mono text-xs leading-relaxed"
-                                ></textarea>
-                            </div>
-                        </div>
-                    )}
-                    
-                    {type === 'local_file' && (
-                         <div className="bg-blue-50/50 border border-blue-100 p-3 rounded-xl flex items-start text-xs text-blue-800">
-                             <p>Columns/Keys will be detected automatically from the file header upon upload. You can map them in the Data Model tab.</p>
-                         </div>
-                    )}
-
-                    {['doximity', 'veeva', 'salesforce', 'linkedin', 'twitter', 'google_scholar'].includes(type) && (
-                         <div className="bg-blue-50/50 border border-blue-100 p-3 rounded-xl flex items-start text-xs text-blue-800">
-                             <p>Standard data models for {type.replace('_', ' ').split(' ').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')} will be auto-discovered. You can map custom fields in the Data Model tab after initial connection.</p>
-                         </div>
-                    )}
-                    
-                    {type === 'rep_feedback' && (
-                         <div className="bg-emerald-50/50 border border-emerald-100 p-3 rounded-xl flex items-start text-xs text-emerald-800">
-                             <p>Expects JSON payload with fields: <code>npi</code>, <code>feedback_text</code>, <code>sentiment_score</code>, <code>date</code>.</p>
-                         </div>
-                    )}
                 </div>
               </div>
 
