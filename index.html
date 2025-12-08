@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Behaviour - HCP Segmentation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+            color: #1e293b;
+        }
+        /* Custom scrollbar for webkit */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.5);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.8);
+        }
+        
+        /* Glass Utilities */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.65);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.45);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            transition: all 0.2s ease-in-out;
+        }
+
+        .glass-sidebar {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Animated Background */
+        .ambient-light {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            z-index: -10;
+            background: radial-gradient(circle at 15% 50%, rgba(230, 240, 255, 0.8), transparent 25%),
+                        radial-gradient(circle at 85% 30%, rgba(240, 230, 255, 0.8), transparent 25%);
+        }
+        
+        .blob {
+            position: absolute;
+            filter: blur(60px);
+            z-index: -1;
+            opacity: 0.6;
+            animation: float 10s infinite ease-in-out;
+        }
+        .blob-1 { top: -10%; left: -10%; width: 50vw; height: 50vw; background: #bfdbfe; animation-delay: 0s; }
+        .blob-2 { bottom: -10%; right: -10%; width: 50vw; height: 50vw; background: #e9d5ff; animation-delay: -5s; }
+        .blob-3 { top: 40%; left: 40%; width: 40vw; height: 40vw; background: #fbcfe8; animation-delay: -2s; opacity: 0.4; }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(30px, -50px) scale(1.1); }
+            66% { transform: translate(-20px, 20px) scale(0.9); }
+            100% { transform: translate(0, 0) scale(1); }
+        }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.31.0",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
+    "recharts": "https://aistudiocdn.com/recharts@^3.5.1",
+    "react/": "https://aistudiocdn.com/react@^19.2.1/",
+    "react": "https://aistudiocdn.com/react@^19.2.1",
+    "clsx": "https://aistudiocdn.com/clsx@^2.1.1"
+  }
+}
+</script>
+</head>
+  <body>
+    <div class="ambient-light">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+    <div id="root"></div>
+  </body>
+</html>
