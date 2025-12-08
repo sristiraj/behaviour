@@ -481,6 +481,14 @@ Secrets management: store connector credentials in secret manager (Vault, AWS Se
 
 Encryption keys managed by enterprise KMS for production.
 
+4.6 Maintainability & Extensibility (Engineering Standards)
+
+To ensure the application remains scalable and maintainable as connector types and business rules grow:
+
+*   **Component Modularity**: Features with high variability (e.g., Connectors, Rule Editors) must be implemented using a modular factory pattern. Each distinct integration or rule type should reside in its own isolated component file.
+*   **Strict Typing**: The codebase must utilize strict TypeScript interfaces shared across frontend and backend (via OpenAPI generation or shared types package) to prevent regression during refactoring.
+*   **Separation of Concerns**: UI rendering logic must be separated from business logic (data fetching, state transformations) via custom hooks or service layers.
+
 Additional operational details
 A. API surface (selected endpoints)
 
@@ -525,56 +533,3 @@ MVP: single-instance FastAPI + SQLite + optional FAISS local.
 Prod: move to Postgres + PostGIS, vector DB (Pinecone / Weaviate / FAISS on S3), Kubernetes, distributed worker for ingestion and embedding creation.
 
 Add auditing, monitoring (Prometheus/Grafana), SSO enforced, integration with enterprise CRM (Veeva, Salesforce).
-
-Example artifacts
-Example canonical HCP JSON (canonical table)
-{
-  "npi":"1234567890",
-  "first_name":"Alex",
-  "last_name":"Smith",
-  "specialty":"Cardiology",
-  "subspecialty":["Interventional Cardiology"],
-  "practice_name":"HeartCare Associates",
-  "practice_type": "Private",
-  "role": "Attending Physician",
-  "primary_address":{"street":"...","city":"Raleigh","state":"NC","zip":"27601"},
-  "years_in_practice": 12,
-  "publications_count": 14,
-  "claims_volume": 1200,
-  "rx_volume": 450,
-  "patient_volume": 2500,
-  "affiliations":[{"hospital":"St. Mary's", "role":"Attending"}],
-  "clinical_trials": ["NCT04567890"],
-  "call_notes": ["Expressed interest in RWE...", "Asked about safety profile..."],
-  "abstracts": ["Title: Registry Outcomes in AFib..."],
-  "social_posts": ["Shared article on new guidelines..."],
-  "emails": [{"date": "2023-10-01", "subject": "Meeting follow-up"}],
-  "campaign_history": [{"id": "camp_01", "name": "Q4 Launch", "status": "Engaged"}],
-  "event_attendance": ["ASCO 2023", "Regional Dinner"],
-  "content_consumption": ["Webinar: New Era of Care", "Email Click: Safety PDF"],
-  "metadata": {
-    "last_call_date":"2025-11-01"
-  }
-}
-
-Example LLM output JSON (segmentation_results.output_json)
-{
-  "persona": "RWE-focused",
-  "influence":"High",
-  "engagement_readiness":"Warm",
-  "channel_preference":"Email",
-  "confidence":0.87,
-  "key_drivers":[
-    "Authored registry study in 2023",
-    "Repeatedly asked for real-world safety evidence in call notes",
-    "Affiliated to major tertiary hospital"
-  ],
-  "recommended_next_action":"Send RWE safety deck + schedule MSL consult"
-}
-
-Example prompt template (for a rule)
-System: You are an expert commercial analytics agent.
-Ontology: <small JSON of key terms and mapping>
-Instruction: Using the ontology and the following documents for HCP {npi}, determine persona, influence (High/Med/Low), engagement readiness (Hot/Warm/Cold), channel_preference, confidence, reasons. Output valid JSON matching schema.
-Few_shot_examples: [...]
-Documents: <doc1> <doc2> ...

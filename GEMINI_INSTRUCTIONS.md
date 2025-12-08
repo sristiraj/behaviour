@@ -15,17 +15,26 @@ This document serves as the ground truth for AI interaction logic and developmen
     *   Maintain the "Glass UI" aesthetic (translucency, blurs, rounded corners).
     *   Ensure all new components are responsive (Tailwind classes for mobile/desktop).
     *   Use `lucide-react` for iconography.
-    *   **Connector Rules**:
-        *   **Oracle DB**: Must always allow setting TNS details (Host, Port, SID) and Credentials (User, Password). Support for JDBC URL is optional but secondary to TNS.
-        *   **GCS**: Must support Authentication Method selection (System, Service Account, Token).
 
-## 2. State Management
+## 2. Component Architecture & Modularity (CRITICAL)
+
+*   **Single Responsibility Principle**:
+    *   Avoid monolithic components. If a component exceeds ~200 lines or handles distinct logic for multiple entity types (e.g., different Connector forms), **split it**.
+    *   Create dedicated sub-directories for grouped features (e.g., `components/connectors/`, `components/rules/`).
+*   **Factory Pattern for Polymorphic UI**:
+    *   When rendering different UI for a discriminated union (like `Connector.type` or `Rule.type`), use a dedicated sub-component for each type (e.g., `OracleForm`, `RestApiForm`) instead of a massive `switch` statement inside the main render function.
+*   **TypeScript Standards**:
+    *   **Strict Typing**: Do not use `any` unless absolutely necessary for dynamic third-party payloads.
+    *   **Shared Types**: All data models must be defined in `types.ts`. Do not define interfaces inside component files if they are shared.
+    *   **Props Interfaces**: Every component must have a strictly typed Props interface.
+
+## 3. State Management
 
 *   **Lifting State Up**: When data needs to be persisted across navigation tabs (e.g., `rules`, `hcps`), lift the state to the parent `App` component. Do not rely on component-level state that resets on unmount (switching tabs).
 *   **Prop Drilling**: Pass state setters (e.g., `setRules`, `onUpdateRules`) down to child components to allow them to modify global state.
 *   **Persistence**: For the React MVP, use in-memory state in `App.tsx` (optionally initialized from `constants.ts`). For production, this should sync with the backend.
 
-## 3. Research & Plan Phase Guidelines
+## 4. Research & Plan Phase Guidelines
 
 *   **UI Logic Verification**: When implementing multi-state UI components (e.g., Tabs, Mode Toggles, Modals), **you must explicitely verify that all conditional rendering paths are implemented**.
     *   *Example Error*: Creating a state variable `mode='webhook'` but failing to add `{mode === 'webhook' && <WebhookUI />}` in the JSX.
@@ -34,7 +43,7 @@ This document serves as the ground truth for AI interaction logic and developmen
 *   **Incremental Updates**: When asked to add a feature (e.g., "Add user entitlements"), extend existing types (`User`, `Group`) rather than creating parallel structures.
 *   **Mock vs. Real**: Clearly distinguish between mock data (for UI dev) and real API calls. If an API key is missing, fallback gracefully to mock data but log a warning.
 
-## 4. Application AI Persona (System Prompting)
+## 5. Application AI Persona (System Prompting)
 
 When configuring the AI agent *within* the application (the NLQ or Segmentation features), follow these persona rules:
 
@@ -46,7 +55,7 @@ When configuring the AI agent *within* the application (the NLQ or Segmentation 
     *   If confidence is low (< 0.5), explicitly state "Low Confidence" in the rationale.
 *   **Context Awareness**: The agent must always respect the provided `Ontology` and `Rules`. If a rule says "RWE-focused requires registry keyword", the agent must not assign that persona without evidence of that keyword.
 
-## 5. Error Handling & Recovery
+## 6. Error Handling & Recovery
 
 *   **API Failures**: If the Gemini API fails (429, 500), the UI should show a user-friendly toast/notification, not a white screen.
 *   **Validation**: Validate all JSON outputs from the LLM using the requested schema. If parsing fails, trigger a retry or fallback to a default "Unsegmented" state.
