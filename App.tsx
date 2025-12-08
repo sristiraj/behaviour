@@ -166,7 +166,7 @@ const App = () => {
     }
 
     switch (activeTab) {
-      case 'dashboard': return <Dashboard />;
+      case 'dashboard': return <Dashboard hcps={hcps} rules={rules} connectors={connectors} />;
       case 'connectors': return <Connectors connectors={connectors} onAddConnector={handleAddConnector} onUpdateConnector={handleUpdateConnector} onDeleteConnector={handleDeleteConnector} />;
       case 'datamodel': return <DataModel connectors={connectors} onUpdateConnector={handleUpdateConnector} links={dataLinks} onUpdateLinks={setDataLinks} attributes={attributes} onUpdateAttributes={setAttributes} />;
       case 'rules': return <Rules attributes={attributes} rules={rules} onUpdateRules={setRules} onRunSegmentation={handleRunSegmentation} />;
