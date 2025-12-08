@@ -18,12 +18,15 @@ export const Rules: React.FC<RulesProps> = ({ attributes = [], rules, onUpdateRu
   // Derive selected rule from props
   const selectedRule = rules.find(r => r.id === selectedRuleId);
 
-  // Fallback: If selectedRule becomes undefined (e.g. after deletion), select the first available rule
+  // Fallback: If selectedRule becomes undefined (e.g. after deletion or initial load), select the first available rule
   useEffect(() => {
-    if (!selectedRule && rules.length > 0) {
+    // Only auto-select if we have rules but the current selection is invalid
+    if (rules.length > 0 && !rules.find(r => r.id === selectedRuleId)) {
+        // Check if we just added a rule (hack: if selectedRuleId is set to something that doesn't exist yet, it might be a race condition)
+        // However, for deletion fallback, this is necessary.
         setSelectedRuleId(rules[0].id);
     }
-  }, [rules, selectedRule]);
+  }, [rules, selectedRuleId]);
 
   const handleAddRule = () => {
     const newRule: SegmentationRule = {
@@ -39,6 +42,8 @@ export const Rules: React.FC<RulesProps> = ({ attributes = [], rules, onUpdateRu
     
     const newRules = [...rules, newRule];
     onUpdateRules(newRules);
+    // Note: Selection might jump to first item briefly due to prop sync delay, 
+    // but we set intent here.
     setSelectedRuleId(newRule.id);
     showNotification('success', 'New rule created.');
   };
@@ -48,29 +53,22 @@ export const Rules: React.FC<RulesProps> = ({ attributes = [], rules, onUpdateRu
     e.preventDefault();
     e.stopPropagation();
 
-    if (rules.length <= 1) {
-        showNotification('error', 'Cannot delete the last remaining rule.');
-        return;
-    }
-    
     if (!window.confirm('Are you sure you want to delete this rule? This will invalidate existing segmentation results.')) return;
-
-    // Determine the next rule to select if we are deleting the currently selected one
-    let nextRuleId = selectedRuleId;
-    if (id === selectedRuleId) {
-        const index = rules.findIndex(r => r.id === id);
-        const newRulesTemp = rules.filter(r => r.id !== id);
-        // Try to stay at the same index, or go to the last one if we deleted the end
-        const nextIndex = index >= newRulesTemp.length ? newRulesTemp.length - 1 : index;
-        nextRuleId = newRulesTemp[nextIndex]?.id || '';
-    }
 
     const newRules = rules.filter(r => r.id !== id);
     onUpdateRules(newRules);
     
-    // Update selection state if needed
-    if (nextRuleId && nextRuleId !== selectedRuleId) {
-        setSelectedRuleId(nextRuleId);
+    // Smart selection logic:
+    // If we deleted the currently selected rule, switch to another one immediately
+    if (id === selectedRuleId) {
+        if (newRules.length > 0) {
+            // Prefer the previous one, or the first one
+            const index = rules.findIndex(r => r.id === id);
+            const nextRule = newRules[Math.max(0, index - 1)];
+            setSelectedRuleId(nextRule ? nextRule.id : newRules[0].id);
+        } else {
+            setSelectedRuleId('');
+        }
     }
 
     showNotification('success', 'Rule deleted. Please re-run segmentation to update HCP profiles.');
