@@ -1,3 +1,4 @@
+
 export interface HCP {
   npi: string;
   first_name: string;
@@ -51,7 +52,7 @@ export interface ScheduleConfig {
 export interface Connector {
   id: string;
   name: string;
-  type: "oracle" | "rest_api" | "gcs" | "local_file";
+  type: "oracle" | "rest_api" | "gcs" | "local_file" | "linkedin" | "twitter" | "doximity" | "veeva" | "salesforce" | "google_scholar" | "rep_feedback";
   status: "active" | "error" | "idle" | "disabled";
   last_run: string;
   row_count: number;

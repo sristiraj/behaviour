@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Database, Plus, RefreshCw, Settings2, X, Upload, FileCode, Globe, Server, Clock, Zap, Edit, Trash2, ArrowRightLeft, Braces, Code, Loader2, Copy, PauseCircle, PlayCircle } from 'lucide-react';
+import { Database, Plus, RefreshCw, Settings2, X, Upload, FileCode, Globe, Server, Clock, Zap, Edit, Trash2, ArrowRightLeft, Braces, Code, Loader2, Copy, PauseCircle, PlayCircle, Linkedin, Twitter, Stethoscope, Cloud, Briefcase, GraduationCap, MessageSquare } from 'lucide-react';
 import { Connector, ScheduleConfig } from '../types';
 
 interface ConnectorsProps {
@@ -49,6 +49,34 @@ export const Connectors: React.FC<ConnectorsProps> = ({ connectors, onAddConnect
   // Local File Config
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
+  // Social Connectors Config
+  const [linkedinClientId, setLinkedinClientId] = useState('');
+  const [linkedinClientSecret, setLinkedinClientSecret] = useState('');
+  const [linkedinOrgId, setLinkedinOrgId] = useState('');
+  
+  const [twitterApiKey, setTwitterApiKey] = useState('');
+  const [twitterApiSecret, setTwitterApiSecret] = useState('');
+  const [twitterBearerToken, setTwitterBearerToken] = useState('');
+
+  // CRM Connectors Config
+  const [doximityClientId, setDoximityClientId] = useState('');
+  const [doximityClientSecret, setDoximityClientSecret] = useState('');
+
+  const [veevaUrl, setVeevaUrl] = useState('');
+  const [veevaUser, setVeevaUser] = useState('');
+  const [veevaPass, setVeevaPass] = useState('');
+  
+  const [sfInstanceUrl, setSfInstanceUrl] = useState('');
+  const [sfClientId, setSfClientId] = useState('');
+  const [sfClientSecret, setSfClientSecret] = useState('');
+  const [sfUser, setSfUser] = useState('');
+  const [sfPass, setSfPass] = useState(''); // Pass + Security Token
+
+  // New Connectors Config
+  const [scholarApiKey, setScholarApiKey] = useState('');
+  const [repFeedbackUrl, setRepFeedbackUrl] = useState('');
+  const [repFeedbackKey, setRepFeedbackKey] = useState('');
+
   // Schedule Modal State
   const [scheduleMode, setScheduleMode] = useState<'manual' | 'cron' | 'webhook'>('manual');
   const [scheduleCron, setScheduleCron] = useState('');
@@ -83,6 +111,25 @@ export const Connectors: React.FC<ConnectorsProps> = ({ connectors, onAddConnect
     setGcsAuthType('system');
     setGcsToken('');
     setSelectedFile(null);
+    setLinkedinClientId('');
+    setLinkedinClientSecret('');
+    setLinkedinOrgId('');
+    setTwitterApiKey('');
+    setTwitterApiSecret('');
+    setTwitterBearerToken('');
+    setDoximityClientId('');
+    setDoximityClientSecret('');
+    setVeevaUrl('');
+    setVeevaUser('');
+    setVeevaPass('');
+    setSfInstanceUrl('');
+    setSfClientId('');
+    setSfClientSecret('');
+    setSfUser('');
+    setSfPass('');
+    setScholarApiKey('');
+    setRepFeedbackUrl('');
+    setRepFeedbackKey('');
     setEditingConnector(null);
   };
 
@@ -114,6 +161,32 @@ export const Connectors: React.FC<ConnectorsProps> = ({ connectors, onAddConnect
         setConfigBucket(config.bucket || '');
         setGcsAuthType(config.authType || 'system');
         setGcsToken(config.accessToken || '');
+    } else if (connector.type === 'linkedin') {
+        setLinkedinClientId(config.clientId || '');
+        setLinkedinClientSecret(config.clientSecret || '');
+        setLinkedinOrgId(config.organizationId || '');
+    } else if (connector.type === 'twitter') {
+        setTwitterApiKey(config.apiKey || '');
+        setTwitterApiSecret(config.apiSecret || '');
+        setTwitterBearerToken(config.bearerToken || '');
+    } else if (connector.type === 'doximity') {
+        setDoximityClientId(config.clientId || '');
+        setDoximityClientSecret(config.clientSecret || '');
+    } else if (connector.type === 'veeva') {
+        setVeevaUrl(config.url || '');
+        setVeevaUser(config.username || '');
+        setVeevaPass('');
+    } else if (connector.type === 'salesforce') {
+        setSfInstanceUrl(config.instanceUrl || '');
+        setSfClientId(config.clientId || '');
+        setSfClientSecret(config.clientSecret || '');
+        setSfUser(config.username || '');
+        setSfPass('');
+    } else if (connector.type === 'google_scholar') {
+        setScholarApiKey(config.apiKey || '');
+    } else if (connector.type === 'rep_feedback') {
+        setRepFeedbackUrl(config.url || '');
+        setRepFeedbackKey(config.apiKey || '');
     }
   };
 
@@ -284,6 +357,46 @@ export const Connectors: React.FC<ConnectorsProps> = ({ connectors, onAddConnect
             config.tokenUrl = oauthTokenUrl;
             config.scopes = oauthScopes;
         }
+    } else if (type === 'linkedin') {
+        config = {
+            clientId: linkedinClientId,
+            clientSecret: linkedinClientSecret ? '*****' : (editingConnector?.config.clientSecret || ''),
+            organizationId: linkedinOrgId
+        };
+    } else if (type === 'twitter') {
+        config = {
+            apiKey: twitterApiKey,
+            apiSecret: twitterApiSecret ? '*****' : (editingConnector?.config.apiSecret || ''),
+            bearerToken: twitterBearerToken ? '*****' : (editingConnector?.config.bearerToken || '')
+        };
+    } else if (type === 'doximity') {
+        config = {
+            clientId: doximityClientId,
+            clientSecret: doximityClientSecret ? '*****' : (editingConnector?.config.clientSecret || '')
+        };
+    } else if (type === 'veeva') {
+        config = {
+            url: veevaUrl,
+            username: veevaUser
+        };
+        if (veevaPass) config.password = veevaPass;
+    } else if (type === 'salesforce') {
+        config = {
+            instanceUrl: sfInstanceUrl,
+            clientId: sfClientId,
+            clientSecret: sfClientSecret ? '*****' : (editingConnector?.config.clientSecret || ''),
+            username: sfUser
+        };
+        if (sfPass) config.password = sfPass;
+    } else if (type === 'google_scholar') {
+        config = {
+            apiKey: scholarApiKey
+        };
+    } else if (type === 'rep_feedback') {
+        config = {
+            url: repFeedbackUrl,
+            apiKey: repFeedbackKey ? '*****' : (editingConnector?.config.apiKey || '')
+        };
     }
 
     // Preserve existing mapping if any (handled in Data Model UI)
@@ -341,6 +454,22 @@ export const Connectors: React.FC<ConnectorsProps> = ({ connectors, onAddConnect
     }
   };
 
+  const getIconForType = (type: string) => {
+      switch(type) {
+          case 'oracle': return Database;
+          case 'gcs': return Server;
+          case 'local_file': return FileCode;
+          case 'linkedin': return Linkedin;
+          case 'twitter': return Twitter;
+          case 'doximity': return Stethoscope;
+          case 'veeva': return Briefcase;
+          case 'salesforce': return Cloud;
+          case 'google_scholar': return GraduationCap;
+          case 'rep_feedback': return MessageSquare;
+          default: return Globe;
+      }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -360,6 +489,8 @@ export const Connectors: React.FC<ConnectorsProps> = ({ connectors, onAddConnect
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {connectors.map((conn) => {
           const isSyncing = syncingIds.has(conn.id);
+          const Icon = getIconForType(conn.type);
+          
           return (
           <div key={conn.id} className={`glass-card p-6 rounded-2xl transition-all group relative overflow-hidden ${conn.status === 'disabled' ? 'bg-slate-100/50 opacity-80' : 'hover:bg-white/60'}`}>
              <div className={`absolute top-0 left-0 w-1 h-full ${
@@ -370,7 +501,7 @@ export const Connectors: React.FC<ConnectorsProps> = ({ connectors, onAddConnect
 
             <div className="flex justify-between items-start mb-4 pl-3">
               <div className={`p-3 rounded-xl transition-colors shadow-sm ${conn.status === 'disabled' ? 'bg-slate-200' : 'bg-white/50 group-hover:bg-blue-50'}`}>
-                <Database className={`w-6 h-6 ${conn.status === 'disabled' ? 'text-slate-400' : 'text-slate-600 group-hover:text-blue-600'}`} />
+                <Icon className={`w-6 h-6 ${conn.status === 'disabled' ? 'text-slate-400' : 'text-slate-600 group-hover:text-blue-600'}`} />
               </div>
               <div className="flex space-x-1 relative z-10">
                 <button 
@@ -558,6 +689,13 @@ export const Connectors: React.FC<ConnectorsProps> = ({ connectors, onAddConnect
                                 <option value="oracle">Oracle Database</option>
                                 <option value="gcs">Google Cloud Storage</option>
                                 <option value="local_file">Local File</option>
+                                <option value="linkedin">LinkedIn</option>
+                                <option value="twitter">Twitter (X)</option>
+                                <option value="doximity">Doximity</option>
+                                <option value="veeva">Veeva CRM (Vault)</option>
+                                <option value="salesforce">Salesforce</option>
+                                <option value="google_scholar">Google Scholar</option>
+                                <option value="rep_feedback">Rep Feedback Aggregator</option>
                             </select>
                         </div>
                     </div>
@@ -603,7 +741,6 @@ export const Connectors: React.FC<ConnectorsProps> = ({ connectors, onAddConnect
                                     </button>
                                 </div>
                             </div>
-                            {/* ... Oracle Host/Port/Auth ... */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="col-span-2">
                                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Host</label>
@@ -643,6 +780,176 @@ export const Connectors: React.FC<ConnectorsProps> = ({ connectors, onAddConnect
                            </div>
                         </div>
                     )}
+
+                    {/* LinkedIn Config */}
+                    {type === 'linkedin' && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                             <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 mb-4 flex items-start">
+                                 <Linkedin className="w-5 h-5 text-blue-700 mr-3 mt-0.5" />
+                                 <div className="text-sm text-blue-900">
+                                     <p className="font-bold">LinkedIn API Access</p>
+                                     <p className="text-xs mt-1">Requires a developer application with the 'Marketing Developer Platform' product enabled.</p>
+                                 </div>
+                             </div>
+                             <div>
+                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Client ID</label>
+                                 <input required type="text" value={linkedinClientId} onChange={(e) => setLinkedinClientId(e.target.value)} className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
+                             </div>
+                             <div>
+                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Client Secret</label>
+                                 <input required type="password" value={linkedinClientSecret} onChange={(e) => setLinkedinClientSecret(e.target.value)} placeholder="••••••••" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
+                             </div>
+                             <div>
+                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Organization ID (Optional)</label>
+                                 <input type="text" value={linkedinOrgId} onChange={(e) => setLinkedinOrgId(e.target.value)} placeholder="e.g. 12345678" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
+                             </div>
+                        </div>
+                    )}
+
+                    {/* Twitter Config */}
+                    {type === 'twitter' && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                             <div className="bg-slate-100/50 p-4 rounded-xl border border-slate-200 mb-4 flex items-start">
+                                 <Twitter className="w-5 h-5 text-slate-700 mr-3 mt-0.5" />
+                                 <div className="text-sm text-slate-900">
+                                     <p className="font-bold">X (Twitter) API Access</p>
+                                     <p className="text-xs mt-1 text-slate-500">Requires Essential or Elevated access to the Twitter API v2.</p>
+                                 </div>
+                             </div>
+                             <div>
+                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">API Key</label>
+                                 <input required type="text" value={twitterApiKey} onChange={(e) => setTwitterApiKey(e.target.value)} className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
+                             </div>
+                             <div>
+                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">API Secret</label>
+                                 <input required type="password" value={twitterApiSecret} onChange={(e) => setTwitterApiSecret(e.target.value)} placeholder="••••••••" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
+                             </div>
+                             <div>
+                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Bearer Token (Optional)</label>
+                                 <input type="password" value={twitterBearerToken} onChange={(e) => setTwitterBearerToken(e.target.value)} placeholder="AAAA..." className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
+                             </div>
+                        </div>
+                    )}
+
+                    {/* Doximity Config */}
+                    {type === 'doximity' && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                             <div className="bg-orange-50/50 p-4 rounded-xl border border-orange-100 mb-4 flex items-start">
+                                 <Stethoscope className="w-5 h-5 text-orange-600 mr-3 mt-0.5" />
+                                 <div className="text-sm text-orange-900">
+                                     <p className="font-bold">Doximity Professional Network</p>
+                                     <p className="text-xs mt-1">Connect to Doximity APIs for HCP verification and network data.</p>
+                                 </div>
+                             </div>
+                             <div>
+                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Client ID</label>
+                                 <input required type="text" value={doximityClientId} onChange={(e) => setDoximityClientId(e.target.value)} className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
+                             </div>
+                             <div>
+                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Client Secret</label>
+                                 <input required type="password" value={doximityClientSecret} onChange={(e) => setDoximityClientSecret(e.target.value)} placeholder="••••••••" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
+                             </div>
+                        </div>
+                    )}
+
+                    {/* Veeva Config */}
+                    {type === 'veeva' && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                             <div className="bg-orange-50/50 p-4 rounded-xl border border-orange-100 mb-4 flex items-start">
+                                 <Briefcase className="w-5 h-5 text-orange-600 mr-3 mt-0.5" />
+                                 <div className="text-sm text-orange-900">
+                                     <p className="font-bold">Veeva CRM / Vault</p>
+                                     <p className="text-xs mt-1">Extract Call Notes, Rep Interactions, and Suggestions via Vault API.</p>
+                                 </div>
+                             </div>
+                             <div>
+                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Vault Domain URL</label>
+                                 <input required type="text" value={veevaUrl} onChange={(e) => setVeevaUrl(e.target.value)} placeholder="https://myvault.veevavault.com" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
+                             </div>
+                             <div>
+                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Username</label>
+                                 <input required type="text" value={veevaUser} onChange={(e) => setVeevaUser(e.target.value)} placeholder="user@company.com" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
+                             </div>
+                             <div>
+                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Password</label>
+                                 <input required type="password" value={veevaPass} onChange={(e) => setVeevaPass(e.target.value)} placeholder="••••••••" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
+                             </div>
+                        </div>
+                    )}
+
+                    {/* Salesforce Config */}
+                    {type === 'salesforce' && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                             <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 mb-4 flex items-start">
+                                 <Cloud className="w-5 h-5 text-blue-600 mr-3 mt-0.5" />
+                                 <div className="text-sm text-blue-900">
+                                     <p className="font-bold">Salesforce CRM</p>
+                                     <p className="text-xs mt-1">Integration via Connected App (Username-Password Flow for backend sync).</p>
+                                 </div>
+                             </div>
+                             <div>
+                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Instance URL</label>
+                                 <input required type="text" value={sfInstanceUrl} onChange={(e) => setSfInstanceUrl(e.target.value)} placeholder="https://na1.salesforce.com" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
+                             </div>
+                             <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Client ID (Consumer Key)</label>
+                                    <input required type="text" value={sfClientId} onChange={(e) => setSfClientId(e.target.value)} className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Client Secret</label>
+                                    <input required type="password" value={sfClientSecret} onChange={(e) => setSfClientSecret(e.target.value)} placeholder="••••••••" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
+                                </div>
+                             </div>
+                             <div>
+                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Salesforce Username</label>
+                                 <input required type="text" value={sfUser} onChange={(e) => setSfUser(e.target.value)} placeholder="user@domain.com" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
+                             </div>
+                             <div>
+                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Password + Security Token</label>
+                                 <input required type="password" value={sfPass} onChange={(e) => setSfPass(e.target.value)} placeholder="pass123TOKENxyz..." className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
+                             </div>
+                        </div>
+                    )}
+                    
+                    {/* Google Scholar Config */}
+                    {type === 'google_scholar' && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                             <div className="bg-slate-100/50 p-4 rounded-xl border border-slate-200 mb-4 flex items-start">
+                                 <GraduationCap className="w-5 h-5 text-slate-700 mr-3 mt-0.5" />
+                                 <div className="text-sm text-slate-900">
+                                     <p className="font-bold">Google Scholar (via API Wrapper)</p>
+                                     <p className="text-xs mt-1">Connects to services like SerpApi or custom scrapers to fetch publication metadata.</p>
+                                 </div>
+                             </div>
+                             <div>
+                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">API Key</label>
+                                 <input required type="text" value={scholarApiKey} onChange={(e) => setScholarApiKey(e.target.value)} placeholder="e.g. SerpApi Key" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
+                             </div>
+                        </div>
+                    )}
+
+                    {/* Rep Feedback Config */}
+                    {type === 'rep_feedback' && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                             <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100 mb-4 flex items-start">
+                                 <MessageSquare className="w-5 h-5 text-emerald-600 mr-3 mt-0.5" />
+                                 <div className="text-sm text-emerald-900">
+                                     <p className="font-bold">Rep Feedback Aggregator</p>
+                                     <p className="text-xs mt-1">Ingest structured feedback from field surveys, voice-of-customer tools, or internal databases.</p>
+                                 </div>
+                             </div>
+                             <div>
+                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Source Endpoint URL</label>
+                                 <input required type="text" value={repFeedbackUrl} onChange={(e) => setRepFeedbackUrl(e.target.value)} placeholder="https://internal.pharma.com/api/feedback" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
+                             </div>
+                             <div>
+                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Auth Token / API Key</label>
+                                 <input required type="password" value={repFeedbackKey} onChange={(e) => setRepFeedbackKey(e.target.value)} placeholder="••••••••" className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800" />
+                             </div>
+                        </div>
+                    )}
+
                 </div>
 
                 {/* Source Definition Section */}
@@ -695,6 +1002,18 @@ export const Connectors: React.FC<ConnectorsProps> = ({ connectors, onAddConnect
                     {type === 'local_file' && (
                          <div className="bg-blue-50/50 border border-blue-100 p-3 rounded-xl flex items-start text-xs text-blue-800">
                              <p>Columns/Keys will be detected automatically from the file header upon upload. You can map them in the Data Model tab.</p>
+                         </div>
+                    )}
+
+                    {['doximity', 'veeva', 'salesforce', 'linkedin', 'twitter', 'google_scholar'].includes(type) && (
+                         <div className="bg-blue-50/50 border border-blue-100 p-3 rounded-xl flex items-start text-xs text-blue-800">
+                             <p>Standard data models for {type.replace('_', ' ').split(' ').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')} will be auto-discovered. You can map custom fields in the Data Model tab after initial connection.</p>
+                         </div>
+                    )}
+                    
+                    {type === 'rep_feedback' && (
+                         <div className="bg-emerald-50/50 border border-emerald-100 p-3 rounded-xl flex items-start text-xs text-emerald-800">
+                             <p>Expects JSON payload with fields: <code>npi</code>, <code>feedback_text</code>, <code>sentiment_score</code>, <code>date</code>.</p>
                          </div>
                     )}
                 </div>

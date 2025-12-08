@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Connector, DataSourceLink, EntityAttribute } from '../types';
-import { Database, FileJson, ArrowRightLeft, Check, AlertCircle, Save, Layers, Link2, Plus, X, Trash2 } from 'lucide-react';
+import { Database, FileJson, ArrowRightLeft, Check, AlertCircle, Save, Layers, Link2, Plus, X, Trash2, Lock } from 'lucide-react';
+import { DEFAULT_ATTRIBUTES } from '../constants';
 
 interface DataModelProps {
   connectors: Connector[];
@@ -35,6 +36,11 @@ export const DataModel: React.FC<DataModelProps> = ({ connectors, onUpdateConnec
     ]);
 
     const selectedConnector = connectors.find(c => c.id === selectedConnectorId);
+    
+    // Check if an attribute is a system default
+    const isSystemAttribute = (key: string) => {
+        return DEFAULT_ATTRIBUTES.some(attr => attr.key === key);
+    };
     
     const getSourceFields = (conn: Connector): string[] => {
         if (!conn) return [];
@@ -136,7 +142,14 @@ export const DataModel: React.FC<DataModelProps> = ({ connectors, onUpdateConnec
     };
 
     const handleDeleteAttribute = (key: string) => {
-        if (!window.confirm("Delete this attribute? Mappings may break.")) return;
+        if (isSystemAttribute(key)) return;
+        
+        const isMapped = connectors.some(c => c.config.mapping && c.config.mapping[key]);
+        const confirmMessage = isMapped 
+            ? `Attribute '${key}' is currently mapped in one or more connectors. Deleting it will break these mappings. Continue?`
+            : "Delete this custom attribute?";
+
+        if (!window.confirm(confirmMessage)) return;
         onUpdateAttributes(attributes.filter(a => a.key !== key));
     };
 
@@ -178,8 +191,8 @@ export const DataModel: React.FC<DataModelProps> = ({ connectors, onUpdateConnec
     };
 
     return (
-        <div className="space-y-6 h-full flex flex-col">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="space-y-6 h-[calc(100vh-140px)] flex flex-col">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 flex-shrink-0">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-800 tracking-tight">Data Model</h1>
                     <p className="text-slate-500 mt-1">Define canonical entities and map ingestion sources.</p>
@@ -211,8 +224,8 @@ export const DataModel: React.FC<DataModelProps> = ({ connectors, onUpdateConnec
 
             {/* TAB: CANONICAL MODEL DEFINITION */}
             {activeTab === 'model' && (
-                <div className="glass-panel rounded-2xl shadow-xl overflow-hidden flex-1 animate-in fade-in slide-in-from-left-4">
-                    <div className="p-6 border-b border-white/40 bg-white/40 flex items-center justify-between">
+                <div className="glass-panel rounded-2xl shadow-xl overflow-hidden flex-1 flex flex-col min-h-0 animate-in fade-in slide-in-from-left-4">
+                    <div className="p-6 border-b border-white/40 bg-white/40 flex items-center justify-between flex-shrink-0">
                          <div className="flex items-center">
                             <div className="bg-indigo-100/50 p-2 rounded-lg mr-3">
                                 <FileJson className="w-5 h-5 text-indigo-600" />
@@ -230,45 +243,63 @@ export const DataModel: React.FC<DataModelProps> = ({ connectors, onUpdateConnec
                             Add Attribute
                          </button>
                     </div>
-                    <div className="p-6">
-                        <div className="bg-white/60 rounded-xl border border-slate-200/50 overflow-hidden">
-                            <table className="min-w-full divide-y divide-slate-200/50">
-                                <thead className="bg-slate-50/50">
-                                    <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Attribute Name</th>
-                                        <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Data Type</th>
-                                        <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Requirement</th>
-                                        <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Description</th>
-                                        <th className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-transparent divide-y divide-slate-200/50">
-                                    {attributes.map((field) => (
-                                        <tr key={field.key} className="hover:bg-white/40 transition-colors group">
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-800 font-mono">{field.key}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                                                <span className="bg-slate-100 px-2 py-1 rounded-md text-xs font-mono">{field.type}</span>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                                                {field.required ? (
-                                                    <span className="text-red-600 font-medium text-xs bg-red-50 px-2 py-1 rounded-full border border-red-100">Required</span>
-                                                ) : (
-                                                    <span className="text-slate-400 text-xs">Optional</span>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4 text-sm text-slate-500">{field.label || field.description}</td>
-                                            <td className="px-6 py-4 text-right">
-                                                <button 
-                                                    onClick={() => handleDeleteAttribute(field.key)}
-                                                    className="text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </td>
+                    
+                    <div className="flex-1 overflow-hidden p-0 relative">
+                        <div className="absolute inset-0 overflow-auto p-6 custom-scrollbar">
+                            <div className="bg-white/60 rounded-xl border border-slate-200/50 overflow-hidden">
+                                <table className="min-w-full divide-y divide-slate-200/50">
+                                    <thead className="bg-slate-50/50 sticky top-0 z-10 backdrop-blur-md">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Attribute Name</th>
+                                            <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Data Type</th>
+                                            <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Requirement</th>
+                                            <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Description</th>
+                                            <th className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody className="bg-transparent divide-y divide-slate-200/50">
+                                        {attributes.map((field) => {
+                                            const isSystem = isSystemAttribute(field.key);
+                                            return (
+                                                <tr key={field.key} className="hover:bg-white/40 transition-colors group">
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-800 font-mono">
+                                                        {field.key}
+                                                        {isSystem && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 border border-slate-200">System</span>}
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                                                        <span className="bg-slate-100 px-2 py-1 rounded-md text-xs font-mono">{field.type}</span>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                                                        {field.required ? (
+                                                            <span className="text-red-600 font-medium text-xs bg-red-50 px-2 py-1 rounded-full border border-red-100">Required</span>
+                                                        ) : (
+                                                            <span className="text-slate-400 text-xs">Optional</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-sm text-slate-500">{field.label || field.description}</td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        {isSystem ? (
+                                                            <div className="text-slate-300 flex justify-end" title="System attribute cannot be deleted">
+                                                                <Lock className="w-4 h-4" />
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex justify-end">
+                                                                <button 
+                                                                    onClick={() => handleDeleteAttribute(field.key)}
+                                                                    className="text-slate-400 hover:text-red-500 transition-colors bg-white/50 p-1.5 rounded-lg hover:bg-white border border-transparent hover:border-slate-200"
+                                                                    title="Delete Custom Attribute"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -276,13 +307,13 @@ export const DataModel: React.FC<DataModelProps> = ({ connectors, onUpdateConnec
 
             {/* TAB: MAPPINGS */}
             {activeTab === 'mapping' && (
-                <div className="flex flex-col lg:flex-row gap-6 h-full animate-in fade-in slide-in-from-right-4">
+                <div className="flex flex-col lg:flex-row gap-6 h-full animate-in fade-in slide-in-from-right-4 min-h-0">
                     {/* Sidebar: Connector List */}
-                    <div className="w-full lg:w-1/4 glass-panel rounded-2xl shadow-lg flex flex-col overflow-hidden">
-                        <div className="p-4 border-b border-white/40 bg-white/40 font-bold text-slate-700 flex items-center">
+                    <div className="w-full lg:w-1/4 glass-panel rounded-2xl shadow-lg flex flex-col overflow-hidden h-full">
+                        <div className="p-4 border-b border-white/40 bg-white/40 font-bold text-slate-700 flex items-center flex-shrink-0">
                             <Database className="w-4 h-4 mr-2" /> Data Sources
                         </div>
-                        <div className="overflow-y-auto flex-1 p-2 space-y-1">
+                        <div className="overflow-y-auto flex-1 p-2 space-y-1 custom-scrollbar">
                             {connectors.map(conn => (
                                 <button
                                     key={conn.id}
@@ -297,10 +328,10 @@ export const DataModel: React.FC<DataModelProps> = ({ connectors, onUpdateConnec
                     </div>
 
                     {/* Main Area: Mapping Table */}
-                    <div className="flex-1 glass-panel rounded-2xl shadow-xl flex flex-col overflow-hidden">
+                    <div className="flex-1 glass-panel rounded-2xl shadow-xl flex flex-col overflow-hidden h-full">
                          {selectedConnector ? (
                              <>
-                                <div className="p-4 border-b border-white/40 bg-white/40 flex items-center justify-between">
+                                <div className="p-4 border-b border-white/40 bg-white/40 flex items-center justify-between flex-shrink-0">
                                     <div>
                                         <h3 className="font-bold text-slate-800 flex items-center">
                                             Mapping: {selectedConnector.name}
@@ -317,15 +348,15 @@ export const DataModel: React.FC<DataModelProps> = ({ connectors, onUpdateConnec
                                 </div>
                                 
                                 {saveStatus && (
-                                    <div className="bg-green-100 text-green-800 px-4 py-2 text-sm font-medium flex items-center justify-center animate-in fade-in slide-in-from-top-2">
+                                    <div className="bg-green-100 text-green-800 px-4 py-2 text-sm font-medium flex items-center justify-center animate-in fade-in slide-in-from-top-2 flex-shrink-0">
                                         <Check className="w-4 h-4 mr-2" /> {saveStatus}
                                     </div>
                                 )}
 
-                                <div className="p-6 overflow-y-auto flex-1 bg-slate-50/30">
+                                <div className="p-6 overflow-y-auto flex-1 bg-slate-50/30 custom-scrollbar">
                                     <div className="bg-white/80 rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                                         <table className="min-w-full divide-y divide-slate-200">
-                                            <thead className="bg-slate-100/80">
+                                            <thead className="bg-slate-100/80 sticky top-0 z-10">
                                                 <tr>
                                                     <th className="px-6 py-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider w-1/3">Target Attribute</th>
                                                     <th className="px-6 py-3 text-center text-xs font-bold text-slate-400 uppercase tracking-wider w-16"><ArrowRightLeft className="w-4 h-4 mx-auto"/></th>
@@ -388,8 +419,8 @@ export const DataModel: React.FC<DataModelProps> = ({ connectors, onUpdateConnec
 
             {/* TAB: LINKING */}
             {activeTab === 'linking' && (
-                <div className="glass-panel rounded-2xl shadow-xl overflow-hidden flex-1 animate-in fade-in slide-in-from-right-4 flex flex-col">
-                     <div className="p-6 border-b border-white/40 bg-white/40 flex items-center justify-between">
+                <div className="glass-panel rounded-2xl shadow-xl overflow-hidden flex-1 animate-in fade-in slide-in-from-right-4 flex flex-col min-h-0">
+                     <div className="p-6 border-b border-white/40 bg-white/40 flex items-center justify-between flex-shrink-0">
                          <div className="flex items-center">
                             <div className="bg-emerald-100/50 p-2 rounded-lg mr-3">
                                 <Link2 className="w-5 h-5 text-emerald-600" />
@@ -408,7 +439,7 @@ export const DataModel: React.FC<DataModelProps> = ({ connectors, onUpdateConnec
                          </button>
                     </div>
 
-                    <div className="p-6 flex-1 overflow-y-auto bg-slate-50/30">
+                    <div className="p-6 flex-1 overflow-y-auto bg-slate-50/30 custom-scrollbar">
                         {links.length === 0 ? (
                              <div className="h-full flex flex-col items-center justify-center text-slate-400">
                                 <Link2 className="w-16 h-16 mb-4 opacity-20" />
@@ -452,106 +483,6 @@ export const DataModel: React.FC<DataModelProps> = ({ connectors, onUpdateConnec
                                 })}
                             </div>
                         )}
-                    </div>
-                </div>
-            )}
-
-            {/* Link Creation Modal */}
-            {isLinkModalOpen && (
-                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="glass-panel rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200 p-6 flex flex-col max-h-[90vh]">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="font-bold text-lg text-slate-800">Create Data Link</h3>
-                            <button onClick={() => setIsLinkModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
-                        </div>
-                        
-                        <div className="space-y-6 flex-1 overflow-y-auto">
-                            {/* Connector Selection */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Primary Source</label>
-                                    <select 
-                                        className="w-full px-3 py-2 bg-white/70 border border-slate-200 rounded-lg text-sm"
-                                        value={newLinkSourceId}
-                                        onChange={(e) => setNewLinkSourceId(e.target.value)}
-                                    >
-                                        {connectors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Target Source</label>
-                                    <select 
-                                        className="w-full px-3 py-2 bg-white/70 border border-slate-200 rounded-lg text-sm"
-                                        value={newLinkTargetId}
-                                        onChange={(e) => setNewLinkTargetId(e.target.value)}
-                                    >
-                                        {connectors.filter(c => c.id !== newLinkSourceId).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="border-t border-slate-200/50 my-4"></div>
-
-                            {/* Conditions List */}
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">Join Conditions (Composite Key Support)</label>
-                                <div className="space-y-3">
-                                    {newLinkConditions.map((condition, index) => (
-                                        <div key={condition.id} className="flex items-center gap-2">
-                                            <div className="flex-1">
-                                                 <select 
-                                                    className="w-full px-3 py-2 bg-white/70 border border-slate-200 rounded-lg text-sm"
-                                                    value={condition.sourceField}
-                                                    onChange={(e) => updateCondition(condition.id, 'sourceField', e.target.value)}
-                                                >
-                                                    <option value="">Select Field...</option>
-                                                    {getSourceFields(connectors.find(c => c.id === newLinkSourceId)!).map(f => (
-                                                        <option key={f} value={f}>{f}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div className="text-slate-400 font-bold">=</div>
-                                            <div className="flex-1">
-                                                 <select 
-                                                    className="w-full px-3 py-2 bg-white/70 border border-slate-200 rounded-lg text-sm"
-                                                    value={condition.targetField}
-                                                    onChange={(e) => updateCondition(condition.id, 'targetField', e.target.value)}
-                                                >
-                                                    <option value="">Select Field...</option>
-                                                    {getSourceFields(connectors.find(c => c.id === newLinkTargetId)!).map(f => (
-                                                        <option key={f} value={f}>{f}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <button 
-                                                onClick={() => removeConditionRow(condition.id)}
-                                                disabled={newLinkConditions.length === 1}
-                                                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400"
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                                <button 
-                                    onClick={addConditionRow}
-                                    className="mt-3 text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center"
-                                >
-                                    <Plus className="w-3 h-3 mr-1" /> Add Join Condition
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="mt-8 flex justify-end space-x-3">
-                            <button onClick={() => setIsLinkModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm font-medium">Cancel</button>
-                            <button 
-                                onClick={handleAddLink} 
-                                disabled={newLinkConditions.some(c => !c.sourceField || !c.targetField)}
-                                className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                Create Link
-                            </button>
-                        </div>
                     </div>
                 </div>
             )}

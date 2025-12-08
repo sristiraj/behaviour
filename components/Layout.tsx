@@ -169,7 +169,7 @@ export const Layout: React.FC<LayoutProps> = ({
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 scroll-smooth">
-          <div className="max-w-7xl mx-auto h-full pb-20">
+          <div className="w-full mx-auto h-full pb-6">
             {children}
           </div>
         </main>

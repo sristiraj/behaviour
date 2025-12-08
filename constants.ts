@@ -1,16 +1,44 @@
+
 import { HCP, Connector, SegmentationRule, User, Group, EntityAttribute } from "./types";
 
 export const DEFAULT_ATTRIBUTES: EntityAttribute[] = [
+    // Identity & Core Profile
     { key: 'npi', label: 'NPI', type: 'string', required: true, description: 'National Provider Identifier' },
     { key: 'first_name', label: 'First Name', type: 'string', required: true, description: 'Given name' },
     { key: 'last_name', label: 'Last Name', type: 'string', required: true, description: 'Family name' },
     { key: 'specialty', label: 'Specialty', type: 'string', required: false, description: 'Primary medical specialty' },
     { key: 'practice_name', label: 'Practice Name', type: 'string', required: false, description: 'Name of primary practice' },
+    { key: 'practice_type', label: 'Practice Type', type: 'string', required: false, description: 'Academic, Private, Health System, etc.' },
+    { key: 'role', label: 'Role/Title', type: 'string', required: false, description: 'Job title or role (e.g., Chief of Cardiology)' },
+    
+    // Contact / Location
     { key: 'city', label: 'City', type: 'string', required: false, description: 'Practice city' },
     { key: 'state', label: 'State', type: 'string', required: false, description: 'Practice state' },
     { key: 'zip', label: 'Zip Code', type: 'string', required: false, description: 'Practice zip code' },
     { key: 'email', label: 'Email', type: 'string', required: false, description: 'Contact email' },
-    { key: 'publications_count', label: 'Publications', type: 'number', required: false, description: 'Total count of authored papers' },
+
+    // Structured Metrics
+    { key: 'years_in_practice', label: 'Years in Practice', type: 'number', required: false, description: 'Years since residency' },
+    { key: 'publications_count', label: 'Publication Count', type: 'number', required: false, description: 'Total count of authored papers' },
+    { key: 'claims_volume', label: 'Claims Volume', type: 'number', required: false, description: 'Aggregated claims volume proxy' },
+    { key: 'rx_volume', label: 'Rx Volume', type: 'number', required: false, description: 'Prescription volume proxy' },
+    { key: 'patient_volume', label: 'Patient Volume', type: 'number', required: false, description: 'Estimated patient panel size' },
+
+    // Complex Objects (Arrays/JSON)
+    { key: 'affiliations', label: 'Affiliations', type: 'array', required: false, description: 'List of hospital/system affiliations' },
+    { key: 'clinical_trials', label: 'Clinical Trials', type: 'array', required: false, description: 'Active or past clinical trials investigated' },
+    
+    // Unstructured Text Data (for RAG)
+    { key: 'call_notes', label: 'Call Notes', type: 'array', required: false, description: 'CRM call notes and interactions' },
+    { key: 'publications', label: 'Publications', type: 'array', required: false, description: 'Full abstracts or citation data' },
+    { key: 'abstracts', label: 'Abstracts', type: 'array', required: false, description: 'Conference abstracts' },
+    { key: 'social_posts', label: 'Social Media', type: 'array', required: false, description: 'Professional social media activity' },
+    { key: 'emails', label: 'Emails', type: 'array', required: false, description: 'Email correspondence history' },
+
+    // Behavioral / Time Series
+    { key: 'campaign_history', label: 'Campaign History', type: 'array', required: false, description: 'Marketing campaigns targeted' },
+    { key: 'event_attendance', label: 'Event Attendance', type: 'array', required: false, description: 'Webinars, congresses, and meetings attended' },
+    { key: 'content_consumption', label: 'Content Consumption', type: 'array', required: false, description: 'Digital content clicks and views' },
 ];
 
 export const MOCK_HCPS: HCP[] = [
@@ -21,16 +49,34 @@ export const MOCK_HCPS: HCP[] = [
     specialty: "Cardiology",
     subspecialty: ["Interventional Cardiology"],
     practice_name: "HeartCare Associates",
+    practice_type: "Private",
+    role: "Attending Physician",
     primary_address: {
       street: "123 Main St",
       city: "Raleigh",
       state: "NC",
       zip: "27601",
     },
+    years_in_practice: 12,
+    publications_count: 14,
+    claims_volume: 1200,
+    rx_volume: 450,
+    patient_volume: 2500,
     affiliations: [
       { hospital: "St. Mary's", role: "Attending" },
       { hospital: "Duke Health", role: "Clinical Affiliate" }
     ],
+    clinical_trials: ["NCT04567890 (Registry)"],
+    call_notes: [
+        "Expressed interest in RWE safety data during last visit.",
+        "Asked about coverage for new anticoagulants."
+    ],
+    abstracts: ["Title: Registry Outcomes in AFib - ACC 2023"],
+    social_posts: [],
+    emails: [],
+    campaign_history: ["Q4 Launch", "Safety First Webinar"],
+    event_attendance: ["ACC 2023"],
+    content_consumption: ["Email Click: Safety PDF"],
     metadata: {
       years_in_practice: 12,
       publications_count: 14,
@@ -59,15 +105,30 @@ export const MOCK_HCPS: HCP[] = [
     specialty: "Oncology",
     subspecialty: ["Hematology"],
     practice_name: "City Cancer Center",
+    practice_type: "Academic",
+    role: "Director of Research",
     primary_address: {
       street: "456 Oak Ave",
       city: "New York",
       state: "NY",
       zip: "10001",
     },
+    years_in_practice: 20,
+    publications_count: 45,
+    claims_volume: 800,
+    rx_volume: 150,
+    patient_volume: 1200,
     affiliations: [
       { hospital: "Mt. Sinai", role: "Director of Research" }
     ],
+    clinical_trials: ["NCT01234567 (Phase 3)", "NCT09876543 (Phase 2)"],
+    call_notes: ["Discussed protocol amendment for upcoming trial.", "Requested meeting with Medical Director."],
+    abstracts: ["Keynote: Future of Heme-Onc - ASCO 2023"],
+    social_posts: ["Excited to present at #ASCO23 this weekend!"],
+    emails: ["Invitation: Advisory Board"],
+    campaign_history: ["KOL Engagement Program"],
+    event_attendance: ["ASCO 2023", "ASH 2022"],
+    content_consumption: [],
     metadata: {
       years_in_practice: 20,
       publications_count: 45,
@@ -96,13 +157,28 @@ export const MOCK_HCPS: HCP[] = [
     specialty: "Cardiology",
     subspecialty: ["General Cardiology"],
     practice_name: "Suburban Cardio",
+    practice_type: "Private",
+    role: "Partner",
     primary_address: {
       street: "789 Pine Ln",
       city: "White Plains",
       state: "NY",
       zip: "10601",
     },
+    years_in_practice: 5,
+    publications_count: 1,
+    claims_volume: 3500,
+    rx_volume: 1200,
+    patient_volume: 5000,
     affiliations: [],
+    clinical_trials: [],
+    call_notes: ["Short interaction, asked for samples.", "Too busy for full detail."],
+    abstracts: [],
+    social_posts: [],
+    emails: ["Opened: Monthly Newsletter"],
+    campaign_history: ["Sample Drop Program"],
+    event_attendance: [],
+    content_consumption: ["Webinar: Billing Codes Update"],
     metadata: {
       years_in_practice: 5,
       publications_count: 1,

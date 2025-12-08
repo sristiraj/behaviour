@@ -10,7 +10,7 @@ Commercial teams and field leaders need fast, reliable qualitative segmentation 
 
 A secure web application (React frontend + FastAPI backend) that:
 
-Ingests heterogeneous HCP datasets via configurable connectors (Oracle, REST APIs, GCS, local files).
+Ingests heterogeneous HCP datasets via configurable connectors (Oracle, REST APIs, GCS, local files, LinkedIn, Twitter, Doximity, Veeva, Salesforce, Google Scholar, Rep Feedback).
 
 Normalizes and stores batched snapshots into an internal application database (SQLite for MVP).
 
@@ -190,6 +190,41 @@ Support CSV/JSON/Parquet, with a required schema mapping step (map columns to ca
 Upload UI with a preview and sample row mapping.
 
 Option to save uploaded file to the app’s local file store or to move to GCS.
+
+e. LinkedIn
+
+Support for OAuth2 client credentials to access Marketing or Sales APIs.
+Config: Client ID, Client Secret, Organization ID.
+
+f. Twitter (X)
+
+Support for API Key/Secret or Bearer Token.
+Config: API Key, API Secret, Bearer Token.
+
+g. Doximity
+
+Support for Doximity API to verify HCP identity and retrieve network data.
+Config: Client ID, Client Secret.
+
+h. Veeva CRM (Vault)
+
+Support for Veeva Vault API (v20+) to ingest Call Notes, Rep Interactions, and Suggestions.
+Config: Vault Domain URL, Username, Password.
+
+i. Salesforce
+
+Support for Salesforce REST API to ingest CRM data (HCP Profiles, Event Logs).
+Config: Instance URL, Client ID, Client Secret, Username, Password (plus Security Token if applicable).
+
+j. Google Scholar
+
+Support for Google Scholar data ingestion via API wrappers (e.g., SerpApi) or custom scrapers.
+Config: API Key (e.g., for SerpApi/Custom Service).
+
+k. Rep Feedback
+
+Support for ingesting structured feedback from field representatives (Surveys, Voice of Customer tools).
+Config: Source Endpoint URL, Auth Token/API Key.
 
 Connector capabilities
 
@@ -500,11 +535,24 @@ Example canonical HCP JSON (canonical table)
   "specialty":"Cardiology",
   "subspecialty":["Interventional Cardiology"],
   "practice_name":"HeartCare Associates",
+  "practice_type": "Private",
+  "role": "Attending Physician",
   "primary_address":{"street":"...","city":"Raleigh","state":"NC","zip":"27601"},
+  "years_in_practice": 12,
+  "publications_count": 14,
+  "claims_volume": 1200,
+  "rx_volume": 450,
+  "patient_volume": 2500,
   "affiliations":[{"hospital":"St. Mary's", "role":"Attending"}],
+  "clinical_trials": ["NCT04567890"],
+  "call_notes": ["Expressed interest in RWE...", "Asked about safety profile..."],
+  "abstracts": ["Title: Registry Outcomes in AFib..."],
+  "social_posts": ["Shared article on new guidelines..."],
+  "emails": [{"date": "2023-10-01", "subject": "Meeting follow-up"}],
+  "campaign_history": [{"id": "camp_01", "name": "Q4 Launch", "status": "Engaged"}],
+  "event_attendance": ["ASCO 2023", "Regional Dinner"],
+  "content_consumption": ["Webinar: New Era of Care", "Email Click: Safety PDF"],
   "metadata": {
-    "years_in_practice": 12,
-    "publications_count": 14,
     "last_call_date":"2025-11-01"
   }
 }
