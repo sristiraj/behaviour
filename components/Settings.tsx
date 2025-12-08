@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Server, Shield, Activity, Globe, Zap, AlertCircle, Loader2, Users, Lock, Plus, Edit2, Trash2, X, Check } from 'lucide-react';
+import { Save, Server, Shield, Activity, Globe, Zap, AlertCircle, Loader2, Users, Lock, Plus, Edit2, Trash2, X, Check, Database, Download, Upload } from 'lucide-react';
 import { getSystemSettings, updateSystemSettings } from '../services/settingsService';
 import { getGroups, getUsers, updateGroup, createGroup, deleteGroup, updateUserProfile } from '../services/userService';
+import { dbService } from '../services/db';
 import { SystemSettings, Group, User, Entitlements } from '../types';
 
 // --- Sub-components for Access Control ---
@@ -250,6 +251,48 @@ export const Settings = () => {
         setSaving(false);
     }
   };
+  
+  const handleExport = async () => {
+    try {
+        const json = await dbService.exportFullState();
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `behaviour_config_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } catch (error) {
+        console.error("Export failed", error);
+        setMessage({ type: 'error', text: 'Failed to export configuration.' });
+    }
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (!window.confirm("Importing will overwrite current configuration. Continue?")) {
+        e.target.value = '';
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+        try {
+            const json = event.target?.result as string;
+            await dbService.importFullState(json);
+            setMessage({ type: 'success', text: 'Configuration imported. Reloading...' });
+            setTimeout(() => window.location.reload(), 1500);
+        } catch (error) {
+            console.error("Import failed", error);
+            setMessage({ type: 'error', text: 'Failed to import configuration. Check file format.' });
+        }
+    };
+    reader.readAsText(file);
+  };
 
   const handleGroupSave = async (group: Group) => {
       setSaving(true);
@@ -357,6 +400,42 @@ export const Settings = () => {
                     Save Configuration
                 </button>
              </div>
+             
+            {/* Database Management */}
+            <div className="glass-panel rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-bottom-2">
+                <div className="p-5 border-b border-white/40 bg-white/40 flex items-center">
+                    <div className="bg-slate-100/50 p-2 rounded-lg mr-3">
+                        <Database className="w-5 h-5 text-slate-600" />
+                    </div>
+                    <h3 className="font-bold text-slate-800">Database Management</h3>
+                </div>
+                <div className="p-8 space-y-6">
+                    <p className="text-sm text-slate-600 mb-4">Export the current system configuration (Connectors, Rules, Users, etc.) to a JSON file for backup or version control. Import to restore state.</p>
+                    <div className="flex gap-4">
+                        <button 
+                            onClick={handleExport}
+                            className="flex items-center bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-xl text-sm font-semibold transition-all shadow-sm"
+                        >
+                            <Download className="w-4 h-4 mr-2" />
+                            Export Configuration
+                        </button>
+                        <div className="relative">
+                            <input 
+                                type="file" 
+                                onChange={handleImport}
+                                accept=".json"
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            />
+                             <button 
+                                className="flex items-center bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-xl text-sm font-semibold transition-all shadow-sm pointer-events-none"
+                            >
+                                <Upload className="w-4 h-4 mr-2" />
+                                Import Configuration
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             {/* LLM Integration */}
             <div className="glass-panel rounded-2xl shadow-xl overflow-hidden">

@@ -7,26 +7,56 @@ import { Rules } from './components/Rules';
 import { NLQ } from './components/NLQ';
 import { Scorecard } from './components/Scorecard';
 import { Settings } from './components/Settings';
-import { MOCK_HCPS, MOCK_CONNECTORS, MOCK_USERS, DEFAULT_ATTRIBUTES, MOCK_RULES } from './constants';
 import { HCP, Connector, User, DataSourceLink, EntityAttribute, SegmentationRule } from './types';
-import { Search, Filter, ChevronRight } from 'lucide-react';
+import { Search, Filter, ChevronRight, Loader2, Database as DbIcon } from 'lucide-react';
 import { getUsers } from './services/userService';
+import { dbService } from './services/db';
+import { MOCK_USERS } from './constants';
 
 const App = () => {
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('scorecards');
   const [selectedHCP, setSelectedHCP] = useState<HCP | null>(null);
-  const [users, setUsers] = useState<User[]>(MOCK_USERS);
-  const [currentUser, setCurrentUser] = useState<User>(MOCK_USERS[0]);
   
-  // Lifted State for Persistence & Interactivity
-  const [connectors, setConnectors] = useState<Connector[]>(MOCK_CONNECTORS);
+  // App State
+  const [users, setUsers] = useState<User[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [connectors, setConnectors] = useState<Connector[]>([]);
   const [dataLinks, setDataLinks] = useState<DataSourceLink[]>([]);
-  const [attributes, setAttributes] = useState<EntityAttribute[]>(DEFAULT_ATTRIBUTES);
-  const [rules, setRules] = useState<SegmentationRule[]>(MOCK_RULES);
-  const [hcps, setHcps] = useState<HCP[]>(MOCK_HCPS);
+  const [attributes, setAttributes] = useState<EntityAttribute[]>([]);
+  const [rules, setRules] = useState<SegmentationRule[]>([]);
+  const [hcps, setHcps] = useState<HCP[]>([]);
 
+  // Initialization
   useEffect(() => {
-    getUsers().then(setUsers);
+    const initApp = async () => {
+        try {
+            await dbService.init();
+            
+            const [fetchedUsers, fetchedConns, fetchedHcps, fetchedRules, fetchedAttrs, fetchedLinks] = await Promise.all([
+                getUsers(),
+                dbService.getAll('connectors'),
+                dbService.getAll('hcps'),
+                dbService.getAll('rules'),
+                dbService.getAll('attributes'),
+                dbService.getAll('links')
+            ]);
+
+            setUsers(fetchedUsers);
+            setCurrentUser(fetchedUsers[0] || MOCK_USERS[0]);
+            setConnectors(fetchedConns);
+            setHcps(fetchedHcps);
+            setRules(fetchedRules);
+            setAttributes(fetchedAttrs);
+            setDataLinks(fetchedLinks);
+
+            setLoading(false);
+        } catch (error) {
+            console.error("Failed to initialize app DB", error);
+        }
+    };
+
+    initApp();
   }, []);
 
   const handleSwitchUser = (userId: string) => {
@@ -38,37 +68,81 @@ const App = () => {
     }
   };
 
-  const handleAddConnector = (newConnector: Connector) => {
-    setConnectors([...connectors, newConnector]);
+  // --- Connector Actions ---
+  const handleAddConnector = async (newConnector: Connector) => {
+    await dbService.upsert('connectors', newConnector);
+    setConnectors(await dbService.getAll('connectors'));
   };
 
-  const handleUpdateConnector = (updatedConnector: Connector) => {
-    setConnectors(connectors.map(c => c.id === updatedConnector.id ? updatedConnector : c));
+  const handleUpdateConnector = async (updatedConnector: Connector) => {
+    await dbService.upsert('connectors', updatedConnector);
+    setConnectors(await dbService.getAll('connectors'));
   };
 
-  const handleDeleteConnector = (connectorId: string) => {
-    setConnectors(prevConnectors => prevConnectors.filter(c => c.id !== connectorId));
-    setDataLinks(prev => prev.filter(l => l.sourceConnectorId !== connectorId && l.targetConnectorId !== connectorId));
+  const handleDeleteConnector = async (connectorId: string) => {
+    await dbService.delete('connectors', connectorId);
+    setConnectors(await dbService.getAll('connectors'));
+  };
+
+  // --- Rule Actions ---
+  const handleUpdateRules = async (updatedRules: SegmentationRule[]) => {
+      // Find diff or just re-save all? For prototype, saving all is safe but inefficient.
+      // Better: check which one changed. But `Rules.tsx` passes the whole array.
+      // We'll iterate and upsert active ones, delete missing ones.
+      
+      const currentIds = updatedRules.map(r => r.id);
+      const prevIds = rules.map(r => r.id);
+      const toDelete = prevIds.filter(id => !currentIds.includes(id));
+
+      for (const id of toDelete) await dbService.delete('rules', id);
+      for (const rule of updatedRules) await dbService.upsert('rules', rule);
+
+      setRules(await dbService.getAll('rules'));
   };
 
   const handleRunSegmentation = async () => {
-    // Simulate backend processing latency
     await new Promise(resolve => setTimeout(resolve, 2000));
     
-    // Simulate an update to HCP data based on "new rules"
-    // In a real app, this would be a fetch call to the backend
+    // Update HCPs in DB
     const updatedHcps = hcps.map(hcp => ({
         ...hcp,
         segmentation_result: hcp.segmentation_result ? {
             ...hcp.segmentation_result,
-            // Simulate score variations based on a "new run"
             confidence: Math.min(0.99, Math.max(0.6, hcp.segmentation_result.confidence + (Math.random() * 0.1 - 0.05))),
             run_date: new Date().toISOString()
         } : undefined
     }));
     
+    for(const h of updatedHcps) {
+        await dbService.upsert('hcps', h);
+    }
     setHcps(updatedHcps);
   };
+
+  // --- Data Model Actions ---
+  const handleUpdateAttributes = async (newAttrs: EntityAttribute[]) => {
+      // Similar sync logic
+      const currentKeys = newAttrs.map(a => a.key);
+      const prevKeys = attributes.map(a => a.key);
+      const toDelete = prevKeys.filter(k => !currentKeys.includes(k));
+
+      for(const k of toDelete) await dbService.delete('attributes', k);
+      for(const attr of newAttrs) await dbService.upsert('attributes', { ...attr, id: attr.key });
+
+      setAttributes(await dbService.getAll('attributes'));
+  };
+
+  const handleUpdateLinks = async (newLinks: DataSourceLink[]) => {
+      const currentIds = newLinks.map(l => l.id);
+      const prevIds = dataLinks.map(l => l.id);
+      const toDelete = prevIds.filter(id => !currentIds.includes(id));
+
+      for(const id of toDelete) await dbService.delete('links', id);
+      for(const link of newLinks) await dbService.upsert('links', link);
+
+      setDataLinks(await dbService.getAll('links'));
+  };
+
 
   // Glassy HCP List
   const HCPList = () => (
@@ -168,14 +242,26 @@ const App = () => {
     switch (activeTab) {
       case 'dashboard': return <Dashboard hcps={hcps} rules={rules} connectors={connectors} />;
       case 'connectors': return <Connectors connectors={connectors} onAddConnector={handleAddConnector} onUpdateConnector={handleUpdateConnector} onDeleteConnector={handleDeleteConnector} />;
-      case 'datamodel': return <DataModel connectors={connectors} onUpdateConnector={handleUpdateConnector} links={dataLinks} onUpdateLinks={setDataLinks} attributes={attributes} onUpdateAttributes={setAttributes} />;
-      case 'rules': return <Rules attributes={attributes} rules={rules} onUpdateRules={setRules} onRunSegmentation={handleRunSegmentation} />;
+      case 'datamodel': return <DataModel connectors={connectors} onUpdateConnector={handleUpdateConnector} links={dataLinks} onUpdateLinks={handleUpdateLinks} attributes={attributes} onUpdateAttributes={handleUpdateAttributes} />;
+      case 'rules': return <Rules attributes={attributes} rules={rules} onUpdateRules={handleUpdateRules} onRunSegmentation={handleRunSegmentation} />;
       case 'scorecards': return <HCPList />;
-      case 'nlq': return <NLQ currentUser={currentUser} />;
+      case 'nlq': return <NLQ currentUser={currentUser || undefined} />;
       case 'admin': return <Settings />;
       default: return <div className="p-10 text-center text-slate-500">Module under development.</div>;
     }
   };
+
+  if (loading || !currentUser) {
+      return (
+          <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50 text-slate-500">
+              <div className="bg-white/50 p-6 rounded-full mb-4 animate-pulse shadow-lg">
+                  <DbIcon className="w-12 h-12 text-blue-500" />
+              </div>
+              <h2 className="text-xl font-bold text-slate-800 mb-2">Loading Database...</h2>
+              <p className="text-sm">Initializing SQLite (WASM) & Syncing Data</p>
+          </div>
+      );
+  }
 
   return (
     <Layout 
