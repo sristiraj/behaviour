@@ -1,19 +1,29 @@
-import React, { useState } from 'react';
-import { MOCK_RULES } from '../constants';
+import React, { useState, useEffect } from 'react';
 import { SegmentationRule, EntityAttribute } from '../types';
-import { FileText, Play, Save, Code, Plus, Trash2, CheckCircle, AlertCircle, Sparkles, AlertTriangle, BookOpen } from 'lucide-react';
+import { Play, Save, Code, Plus, Trash2, CheckCircle, AlertCircle, Sparkles, AlertTriangle, BookOpen, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 
 interface RulesProps {
     attributes?: EntityAttribute[];
+    rules: SegmentationRule[];
+    onUpdateRules: (rules: SegmentationRule[]) => void;
+    onRunSegmentation?: () => Promise<void>;
 }
 
-export const Rules: React.FC<RulesProps> = ({ attributes = [] }) => {
-  const [rules, setRules] = useState<SegmentationRule[]>(MOCK_RULES);
+export const Rules: React.FC<RulesProps> = ({ attributes = [], rules, onUpdateRules, onRunSegmentation }) => {
   const [selectedRuleId, setSelectedRuleId] = useState<string>(rules[0]?.id || '');
   const [notification, setNotification] = useState<{type: 'success' | 'error', text: string} | null>(null);
+  const [isRunning, setIsRunning] = useState(false);
 
+  // Derive selected rule from props
   const selectedRule = rules.find(r => r.id === selectedRuleId);
+
+  // Fallback: If selectedRule becomes undefined (e.g. after deletion), select the first available rule
+  useEffect(() => {
+    if (!selectedRule && rules.length > 0) {
+        setSelectedRuleId(rules[0].id);
+    }
+  }, [rules, selectedRule]);
 
   const handleAddRule = () => {
     const newRule: SegmentationRule = {
@@ -26,25 +36,44 @@ export const Rules: React.FC<RulesProps> = ({ attributes = [] }) => {
       active: false,
       priority: rules.length + 1
     };
-    setRules([...rules, newRule]);
+    
+    const newRules = [...rules, newRule];
+    onUpdateRules(newRules);
     setSelectedRuleId(newRule.id);
     showNotification('success', 'New rule created.');
   };
 
   const handleDeleteRule = (e: React.MouseEvent, id: string) => {
+    // Crucial: stop propagation to prevent the card click handler (selection) from firing
+    e.preventDefault();
     e.stopPropagation();
+
     if (rules.length <= 1) {
         showNotification('error', 'Cannot delete the last remaining rule.');
         return;
     }
-    if (!window.confirm('Are you sure you want to delete this rule?')) return;
+    
+    if (!window.confirm('Are you sure you want to delete this rule? This will invalidate existing segmentation results.')) return;
+
+    // Determine the next rule to select if we are deleting the currently selected one
+    let nextRuleId = selectedRuleId;
+    if (id === selectedRuleId) {
+        const index = rules.findIndex(r => r.id === id);
+        const newRulesTemp = rules.filter(r => r.id !== id);
+        // Try to stay at the same index, or go to the last one if we deleted the end
+        const nextIndex = index >= newRulesTemp.length ? newRulesTemp.length - 1 : index;
+        nextRuleId = newRulesTemp[nextIndex]?.id || '';
+    }
 
     const newRules = rules.filter(r => r.id !== id);
-    setRules(newRules);
-    if (id === selectedRuleId) {
-        setSelectedRuleId(newRules[0].id);
+    onUpdateRules(newRules);
+    
+    // Update selection state if needed
+    if (nextRuleId && nextRuleId !== selectedRuleId) {
+        setSelectedRuleId(nextRuleId);
     }
-    showNotification('success', 'Rule deleted.');
+
+    showNotification('success', 'Rule deleted. Please re-run segmentation to update HCP profiles.');
   };
 
   const updateRule = (field: keyof SegmentationRule, value: any) => {
@@ -52,16 +81,42 @@ export const Rules: React.FC<RulesProps> = ({ attributes = [] }) => {
     const updatedRules = rules.map(r => 
         r.id === selectedRuleId ? { ...r, [field]: value } : r
     );
-    setRules(updatedRules);
+    onUpdateRules(updatedRules);
+  };
+
+  const handleRunSegmentation = async () => {
+      if (isRunning) return;
+      
+      const activeRules = rules.filter(r => r.active);
+      if (activeRules.length === 0) {
+          showNotification('error', 'No active rules to run. Please activate at least one rule.');
+          return;
+      }
+
+      setIsRunning(true);
+      
+      try {
+          if (onRunSegmentation) {
+              await onRunSegmentation();
+          } else {
+              await new Promise(resolve => setTimeout(resolve, 2500));
+          }
+          showNotification('success', `Segmentation complete. Applied ${activeRules.length} rules to updated HCP profiles.`);
+      } catch (error) {
+          showNotification('error', 'Failed to run segmentation job.');
+      } finally {
+          setIsRunning(false);
+      }
   };
 
   const showNotification = (type: 'success' | 'error', text: string) => {
       setNotification({ type, text });
-      setTimeout(() => setNotification(null), 3000);
+      setTimeout(() => setNotification(null), 4000);
   };
 
   return (
     <div className="h-full flex flex-col space-y-6 relative">
+       {/* Notifications */}
        {notification && (
         <div className={clsx(
             "absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-full mt-4 px-4 py-2 rounded-xl shadow-lg flex items-center text-sm font-medium z-50 animate-in slide-in-from-top-4 fade-in duration-300",
@@ -72,15 +127,27 @@ export const Rules: React.FC<RulesProps> = ({ attributes = [] }) => {
         </div>
        )}
 
+       {/* Header */}
        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
             <h1 className="text-3xl font-bold text-slate-800 tracking-tight">Segmentation Rules</h1>
             <p className="text-slate-500 mt-1">Define LLM instructions and logic to segment HCPs.</p>
         </div>
         <div className="flex space-x-3">
-             <button className="flex items-center glass-panel hover:bg-white/80 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors border border-transparent hover:border-slate-200">
-                <Play className="w-4 h-4 mr-2 text-indigo-500" />
-                Run Simulation
+             <button 
+                onClick={handleRunSegmentation}
+                disabled={isRunning}
+                className={clsx(
+                    "flex items-center glass-panel hover:bg-white/80 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors border border-transparent hover:border-slate-200 disabled:opacity-70 disabled:cursor-not-allowed",
+                    isRunning && "bg-blue-50 text-blue-700"
+                )}
+             >
+                {isRunning ? (
+                    <Loader2 className="w-4 h-4 mr-2 text-blue-600 animate-spin" />
+                ) : (
+                    <Play className="w-4 h-4 mr-2 text-indigo-500" />
+                )}
+                {isRunning ? "Processing..." : "Run Segmentation"}
             </button>
             <button 
                 onClick={() => showNotification('success', 'Rules configuration saved.')}
@@ -93,7 +160,7 @@ export const Rules: React.FC<RulesProps> = ({ attributes = [] }) => {
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6 h-full min-h-[600px]">
-        {/* Rule List */}
+        {/* Rule List Sidebar */}
         <div className="w-full lg:w-1/4 glass-panel rounded-2xl shadow-xl flex flex-col overflow-hidden">
             <div className="p-4 border-b border-white/40 bg-white/40 flex items-center justify-between">
                 <h3 className="font-bold text-slate-700">Active Rules</h3>
@@ -118,10 +185,10 @@ export const Rules: React.FC<RulesProps> = ({ attributes = [] }) => {
                         )}
                     >
                         <div className="flex justify-between mb-2">
-                            <span className={clsx("font-bold text-sm", selectedRuleId === rule.id ? "text-blue-900" : "text-slate-800")}>
+                            <span className={clsx("font-bold text-sm truncate pr-2", selectedRuleId === rule.id ? "text-blue-900" : "text-slate-800")}>
                                 {rule.name}
                             </span>
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-2 flex-shrink-0">
                                 <span className={clsx(
                                     "text-[10px] uppercase font-bold px-2 py-0.5 rounded-full",
                                     rule.type === 'llm_instruction' ? "bg-purple-100 text-purple-700" : "bg-amber-100 text-amber-700"
@@ -135,9 +202,11 @@ export const Rules: React.FC<RulesProps> = ({ attributes = [] }) => {
                         </div>
                         <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed pr-6">{rule.description}</p>
                         
+                        {/* Delete Button on Card - High Z-Index to ensure clickability */}
                         <button 
                             onClick={(e) => handleDeleteRule(e, rule.id)}
-                            className="absolute bottom-3 right-3 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                            className="absolute bottom-3 right-3 p-1.5 bg-white/80 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition-all opacity-0 group-hover:opacity-100 shadow-sm border border-slate-100 z-10"
+                            title="Delete Rule"
                         >
                             <Trash2 className="w-4 h-4" />
                         </button>
@@ -146,13 +215,13 @@ export const Rules: React.FC<RulesProps> = ({ attributes = [] }) => {
             </div>
         </div>
 
-        {/* Editor */}
+        {/* Rule Editor */}
         <div className="w-full lg:w-3/4 glass-panel rounded-2xl shadow-xl flex flex-col overflow-hidden">
              {selectedRule ? (
                  <>
                     <div className="p-4 border-b border-white/40 bg-white/40 flex items-center justify-between">
-                        <div className="flex items-center">
-                            <div className={clsx("p-2 rounded-lg mr-3", selectedRule.type === 'llm_instruction' ? "bg-purple-100/50 text-purple-600" : "bg-amber-100/50 text-amber-600")}>
+                        <div className="flex items-center flex-1 mr-4">
+                            <div className={clsx("p-2 rounded-lg mr-3 flex-shrink-0", selectedRule.type === 'llm_instruction' ? "bg-purple-100/50 text-purple-600" : "bg-amber-100/50 text-amber-600")}>
                                 {selectedRule.type === 'llm_instruction' ? <Sparkles className="w-5 h-5" /> : <Code className="w-5 h-5" />}
                             </div>
                             <input 
@@ -163,11 +232,19 @@ export const Rules: React.FC<RulesProps> = ({ attributes = [] }) => {
                                 placeholder="Rule Name"
                             />
                         </div>
-                        <span className="text-xs font-mono text-slate-400 bg-white/50 px-2 py-1 rounded-md border border-white/50">{selectedRule.id}</span>
+                        <div className="flex items-center gap-3">
+                            <span className="text-xs font-mono text-slate-400 bg-white/50 px-2 py-1 rounded-md border border-white/50">{selectedRule.id}</span>
+                            <button 
+                                onClick={(e) => handleDeleteRule(e, selectedRule.id)}
+                                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Delete Rule"
+                            >
+                                <Trash2 className="w-5 h-5" />
+                            </button>
+                        </div>
                     </div>
                     
                     <div className="flex flex-1 overflow-hidden">
-                        {/* Main Form */}
                         <div className="p-6 flex-1 space-y-6 overflow-y-auto">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
@@ -206,7 +283,7 @@ export const Rules: React.FC<RulesProps> = ({ attributes = [] }) => {
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-2">Description</label>
                                 <input 
-                                    type="text"
+                                    type="text" 
                                     value={selectedRule.description}
                                     onChange={(e) => updateRule('description', e.target.value)}
                                     className="w-full px-4 py-2.5 bg-white/60 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-800 placeholder-slate-400"
@@ -221,7 +298,7 @@ export const Rules: React.FC<RulesProps> = ({ attributes = [] }) => {
                                         value={selectedRule.context || ''}
                                         onChange={(e) => updateRule('context', e.target.value)}
                                         className="w-full p-4 font-mono text-sm bg-white/60 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none shadow-sm min-h-[100px] resize-y text-slate-700"
-                                        placeholder="Provide additional background information, definitions, or global parameters to guide the LLM..."
+                                        placeholder="Provide additional background information..."
                                     />
                                 </div>
                             )}
@@ -254,7 +331,7 @@ export const Rules: React.FC<RulesProps> = ({ attributes = [] }) => {
                             </div>
                         </div>
 
-                        {/* Schema Reference Sidebar */}
+                        {/* Sidebar for attributes */}
                         <div className="w-64 bg-slate-50/50 border-l border-white/40 overflow-y-auto p-4 hidden xl:block">
                             <h4 className="font-bold text-slate-600 text-xs uppercase tracking-wide mb-3 flex items-center">
                                 <BookOpen className="w-3 h-3 mr-1.5" /> Available Data Points

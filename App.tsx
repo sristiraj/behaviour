@@ -7,8 +7,8 @@ import { Rules } from './components/Rules';
 import { NLQ } from './components/NLQ';
 import { Scorecard } from './components/Scorecard';
 import { Settings } from './components/Settings';
-import { MOCK_HCPS, MOCK_CONNECTORS, MOCK_USERS, DEFAULT_ATTRIBUTES } from './constants';
-import { HCP, Connector, User, DataSourceLink, EntityAttribute } from './types';
+import { MOCK_HCPS, MOCK_CONNECTORS, MOCK_USERS, DEFAULT_ATTRIBUTES, MOCK_RULES } from './constants';
+import { HCP, Connector, User, DataSourceLink, EntityAttribute, SegmentationRule } from './types';
 import { Search, Filter, ChevronRight } from 'lucide-react';
 import { getUsers } from './services/userService';
 
@@ -18,9 +18,12 @@ const App = () => {
   const [users, setUsers] = useState<User[]>(MOCK_USERS);
   const [currentUser, setCurrentUser] = useState<User>(MOCK_USERS[0]);
   
+  // Lifted State for Persistence & Interactivity
   const [connectors, setConnectors] = useState<Connector[]>(MOCK_CONNECTORS);
   const [dataLinks, setDataLinks] = useState<DataSourceLink[]>([]);
   const [attributes, setAttributes] = useState<EntityAttribute[]>(DEFAULT_ATTRIBUTES);
+  const [rules, setRules] = useState<SegmentationRule[]>(MOCK_RULES);
+  const [hcps, setHcps] = useState<HCP[]>(MOCK_HCPS);
 
   useEffect(() => {
     getUsers().then(setUsers);
@@ -45,8 +48,26 @@ const App = () => {
 
   const handleDeleteConnector = (connectorId: string) => {
     setConnectors(prevConnectors => prevConnectors.filter(c => c.id !== connectorId));
-    // Also remove links associated with this connector
     setDataLinks(prev => prev.filter(l => l.sourceConnectorId !== connectorId && l.targetConnectorId !== connectorId));
+  };
+
+  const handleRunSegmentation = async () => {
+    // Simulate backend processing latency
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Simulate an update to HCP data based on "new rules"
+    // In a real app, this would be a fetch call to the backend
+    const updatedHcps = hcps.map(hcp => ({
+        ...hcp,
+        segmentation_result: hcp.segmentation_result ? {
+            ...hcp.segmentation_result,
+            // Simulate score variations based on a "new run"
+            confidence: Math.min(0.99, Math.max(0.6, hcp.segmentation_result.confidence + (Math.random() * 0.1 - 0.05))),
+            run_date: new Date().toISOString()
+        } : undefined
+    }));
+    
+    setHcps(updatedHcps);
   };
 
   // Glassy HCP List
@@ -87,7 +108,7 @@ const App = () => {
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200/50 bg-white/30">
-                    {MOCK_HCPS.map((hcp) => (
+                    {hcps.map((hcp) => (
                         <tr 
                             key={hcp.npi} 
                             className="hover:bg-blue-50/40 transition-colors cursor-pointer group"
@@ -148,7 +169,7 @@ const App = () => {
       case 'dashboard': return <Dashboard />;
       case 'connectors': return <Connectors connectors={connectors} onAddConnector={handleAddConnector} onUpdateConnector={handleUpdateConnector} onDeleteConnector={handleDeleteConnector} />;
       case 'datamodel': return <DataModel connectors={connectors} onUpdateConnector={handleUpdateConnector} links={dataLinks} onUpdateLinks={setDataLinks} attributes={attributes} onUpdateAttributes={setAttributes} />;
-      case 'rules': return <Rules attributes={attributes} />;
+      case 'rules': return <Rules attributes={attributes} rules={rules} onUpdateRules={setRules} onRunSegmentation={handleRunSegmentation} />;
       case 'scorecards': return <HCPList />;
       case 'nlq': return <NLQ currentUser={currentUser} />;
       case 'admin': return <Settings />;
