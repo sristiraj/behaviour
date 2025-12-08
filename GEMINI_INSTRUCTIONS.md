@@ -11,7 +11,6 @@ This document serves as the ground truth for AI interaction logic and developmen
     *   Do NOT use deprecated methods like `getGenerativeModel`.
     *   Use specific model versions (e.g., `gemini-2.5-flash`, `gemini-3-pro-preview`) based on task complexity.
     *   When using `responseSchema`, ensure it is valid JSON Schema compatible with the SDK types.
-*   **State Management**: For this React MVP, prefer local state (`useState`) or simple Context. Do not introduce Redux or other heavy libraries unless the app complexity necessitates it.
 *   **UI/UX**:
     *   Maintain the "Glass UI" aesthetic (translucency, blurs, rounded corners).
     *   Ensure all new components are responsive (Tailwind classes for mobile/desktop).
@@ -20,7 +19,13 @@ This document serves as the ground truth for AI interaction logic and developmen
         *   **Oracle DB**: Must always allow setting TNS details (Host, Port, SID) and Credentials (User, Password). Support for JDBC URL is optional but secondary to TNS.
         *   **GCS**: Must support Authentication Method selection (System, Service Account, Token).
 
-## 2. Research & Plan Phase Guidelines
+## 2. State Management
+
+*   **Lifting State Up**: When data needs to be persisted across navigation tabs (e.g., `rules`, `hcps`), lift the state to the parent `App` component. Do not rely on component-level state that resets on unmount (switching tabs).
+*   **Prop Drilling**: Pass state setters (e.g., `setRules`, `onUpdateRules`) down to child components to allow them to modify global state.
+*   **Persistence**: For the React MVP, use in-memory state in `App.tsx` (optionally initialized from `constants.ts`). For production, this should sync with the backend.
+
+## 3. Research & Plan Phase Guidelines
 
 *   **UI Logic Verification**: When implementing multi-state UI components (e.g., Tabs, Mode Toggles, Modals), **you must explicitely verify that all conditional rendering paths are implemented**.
     *   *Example Error*: Creating a state variable `mode='webhook'` but failing to add `{mode === 'webhook' && <WebhookUI />}` in the JSX.
@@ -29,7 +34,7 @@ This document serves as the ground truth for AI interaction logic and developmen
 *   **Incremental Updates**: When asked to add a feature (e.g., "Add user entitlements"), extend existing types (`User`, `Group`) rather than creating parallel structures.
 *   **Mock vs. Real**: Clearly distinguish between mock data (for UI dev) and real API calls. If an API key is missing, fallback gracefully to mock data but log a warning.
 
-## 3. Application AI Persona (System Prompting)
+## 4. Application AI Persona (System Prompting)
 
 When configuring the AI agent *within* the application (the NLQ or Segmentation features), follow these persona rules:
 
@@ -41,7 +46,7 @@ When configuring the AI agent *within* the application (the NLQ or Segmentation 
     *   If confidence is low (< 0.5), explicitly state "Low Confidence" in the rationale.
 *   **Context Awareness**: The agent must always respect the provided `Ontology` and `Rules`. If a rule says "RWE-focused requires registry keyword", the agent must not assign that persona without evidence of that keyword.
 
-## 4. Error Handling & Recovery
+## 5. Error Handling & Recovery
 
 *   **API Failures**: If the Gemini API fails (429, 500), the UI should show a user-friendly toast/notification, not a white screen.
 *   **Validation**: Validate all JSON outputs from the LLM using the requested schema. If parsing fails, trigger a retry or fallback to a default "Unsegmented" state.
