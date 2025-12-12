@@ -1,3 +1,4 @@
+
 import { HCP, SegmentationResult } from "../types";
 import { getSystemSettings } from "./settingsService";
 import { dbService } from "./db";
@@ -12,7 +13,7 @@ Your goals:
 
 /**
  * Simulates the "What-If" or NLQ analysis on an HCP profile.
- * Now delegated to Python Backend.
+ * Now delegated to Node.js Backend.
  */
 export const runNLQAnalysis = async (
   query: string,
@@ -46,13 +47,13 @@ export const runNLQAnalysis = async (
   } catch (error) {
     console.error("NLQ Error (Backend):", error);
     // Fallback Mock
-    return "Error connecting to the intelligence engine (Backend). Please ensure the FastAPI backend is running on port 8000.\n\n(Mock): Based on the query, we found matching profiles.";
+    return "Error connecting to the intelligence engine (Backend). Please ensure the Node.js server is running on port 3001.\n\n(Mock): Based on the query, we found matching profiles.";
   }
 };
 
 /**
  * Simulates running a segmentation rule on a specific HCP.
- * Now delegated to Python Backend.
+ * Now delegated to Node.js Backend.
  */
 export const runSegmentationPreview = async (
   hcp: HCP,
@@ -93,7 +94,7 @@ export const runSegmentationPreview = async (
       confidence: 0.0,
       key_drivers: ["Backend connection failed"],
       recommended_next_action: "Check console logs",
-      rationale: "Could not reach FastAPI backend.",
+      rationale: "Could not reach Node.js backend on port 3001.",
       run_date: new Date().toISOString()
     };
   }

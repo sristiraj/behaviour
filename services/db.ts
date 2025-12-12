@@ -15,9 +15,9 @@ class DatabaseService {
     private db: any = null;
     private initialized: boolean = false;
     private initPromise: Promise<void> | null = null;
-    // UPDATED: Default to remote to use the FastAPI backend
+    // UPDATED: Default to remote to use the Node.js backend on port 3001
     private mode: StorageMode = 'remote';
-    private apiBaseUrl: string = 'http://localhost:8000/api';
+    private apiBaseUrl: string = 'http://localhost:3001/api';
 
     constructor() {
         this.initPromise = this.init();
@@ -50,7 +50,7 @@ class DatabaseService {
                      await this.seedRemote();
                  }
             } catch (e) {
-                console.warn("Backend connection failed. Please ensure 'backend/main.py' is running on port 8000.");
+                console.warn("Backend connection failed. Please ensure 'backend/server.ts' is running on port 3001.");
             }
         }
 
