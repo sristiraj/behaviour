@@ -17,7 +17,7 @@ const PORT = 3001;
 const DB_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'database.json');
 
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: '50mb' }) as any);
 
 // --- Simple File-Based Persistence ---
 let db: Record<string, any[]> = {
