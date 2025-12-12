@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Server, Shield, Activity, Globe, Zap, AlertCircle, Loader2, Users, Lock, Plus, Edit2, Trash2, X, Check, Database, Download, Upload } from 'lucide-react';
+import { Save, Server, Shield, Activity, Globe, Zap, AlertCircle, Loader2, Users, Lock, Plus, Edit2, Trash2, X, Check, Database, Download, Upload, HardDrive, Network } from 'lucide-react';
 import { getSystemSettings, updateSystemSettings } from '../services/settingsService';
 import { getGroups, getUsers, updateGroup, createGroup, deleteGroup, updateUserProfile } from '../services/userService';
 import { dbService } from '../services/db';
@@ -204,6 +204,10 @@ export const Settings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
+  // Storage config
+  const [storageMode, setStorageMode] = useState<'local' | 'remote'>(dbService.getMode());
+  const [apiUrl, setApiUrl] = useState(dbService.getApiUrl());
+  
   // System Config State
   const [settings, setSettings] = useState<SystemSettings | null>(null);
   
@@ -223,16 +227,19 @@ export const Settings = () => {
   const loadData = async () => {
     setLoading(true);
     try {
+        // Handle potential failure if remote is down during init
         const [sys, usrs, grps] = await Promise.all([
-            getSystemSettings(),
-            getUsers(),
-            getGroups()
+            getSystemSettings().catch(() => null),
+            getUsers().catch(() => []),
+            getGroups().catch(() => [])
         ]);
-        setSettings(sys);
+        
+        if (sys) setSettings(sys);
         setUsers(usrs);
         setGroups(grps);
     } catch (e) {
         console.error("Failed to load settings data", e);
+        setMessage({ type: 'error', text: 'Failed to load some settings.' });
     } finally {
         setLoading(false);
     }
@@ -244,10 +251,11 @@ export const Settings = () => {
     setMessage(null);
     try {
         await updateSystemSettings(settings);
-        setMessage({ type: 'success', text: 'System settings updated successfully.' });
+        // Also save storage mode preferences
+        await dbService.setMode(storageMode, apiUrl);
+        setMessage({ type: 'success', text: 'Configuration saved. (Reloading...)' });
     } catch (e) {
         setMessage({ type: 'error', text: 'Failed to update settings.' });
-    } finally {
         setSaving(false);
     }
   };
@@ -349,13 +357,19 @@ export const Settings = () => {
     });
   };
 
-  if (loading || !settings) {
+  if (loading && !settings) {
       return (
           <div className="flex items-center justify-center h-full">
               <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
           </div>
       );
   }
+
+  // Fallback if settings didn't load (e.g. fresh remote DB)
+  const safeSettings = settings || {
+      llmConfig: { mode: 'direct', agentEndpoint: '', location: 'us-central1' },
+      tracingConfig: { provider: 'none', sampleRate: 1.0 }
+  } as SystemSettings;
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
@@ -400,6 +414,51 @@ export const Settings = () => {
                     Save Configuration
                 </button>
              </div>
+
+             {/* Storage Provider */}
+             <div className="glass-panel rounded-2xl shadow-xl overflow-hidden">
+                <div className="p-5 border-b border-white/40 bg-white/40 flex items-center">
+                    <div className="bg-slate-100/50 p-2 rounded-lg mr-3">
+                        <HardDrive className="w-5 h-5 text-slate-600" />
+                    </div>
+                    <h3 className="font-bold text-slate-800">Storage Provider</h3>
+                </div>
+                <div className="p-8 space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div 
+                            onClick={() => setStorageMode('local')}
+                            className={`cursor-pointer border-2 rounded-xl p-5 transition-all relative overflow-hidden ${storageMode === 'local' ? 'border-emerald-500 bg-emerald-50/50 shadow-md' : 'border-transparent bg-white/50 hover:bg-white/70'}`}
+                        >
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="font-bold text-slate-900 flex items-center"><Database className="w-4 h-4 mr-2"/> Browser (WASM)</span>
+                                {storageMode === 'local' && <div className="w-3 h-3 rounded-full bg-emerald-600 shadow-sm"></div>}
+                            </div>
+                            <p className="text-xs text-slate-500 leading-relaxed">Stores data in-memory within the browser using SQLite WASM. Persists via IndexedDB. Best for demos.</p>
+                        </div>
+                        <div 
+                            onClick={() => setStorageMode('remote')}
+                            className={`cursor-pointer border-2 rounded-xl p-5 transition-all relative overflow-hidden ${storageMode === 'remote' ? 'border-purple-500 bg-purple-50/50 shadow-md' : 'border-transparent bg-white/50 hover:bg-white/70'}`}
+                        >
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="font-bold text-slate-900 flex items-center"><Network className="w-4 h-4 mr-2"/> Remote Server (FastAPI)</span>
+                                {storageMode === 'remote' && <div className="w-3 h-3 rounded-full bg-purple-600 shadow-sm"></div>}
+                            </div>
+                            <p className="text-xs text-slate-500 leading-relaxed">Connects to a Python/FastAPI backend. Requires running <code>backend/main.py</code> locally.</p>
+                        </div>
+                    </div>
+                    {storageMode === 'remote' && (
+                        <div className="animate-in fade-in slide-in-from-top-2">
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">API Base URL</label>
+                            <input 
+                                type="text" 
+                                value={apiUrl}
+                                onChange={(e) => setApiUrl(e.target.value)}
+                                className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none transition-shadow"
+                            />
+                        </div>
+                    )}
+                </div>
+             </div>
              
             {/* Database Management */}
             <div className="glass-panel rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-bottom-2">
@@ -407,7 +466,7 @@ export const Settings = () => {
                     <div className="bg-slate-100/50 p-2 rounded-lg mr-3">
                         <Database className="w-5 h-5 text-slate-600" />
                     </div>
-                    <h3 className="font-bold text-slate-800">Database Management</h3>
+                    <h3 className="font-bold text-slate-800">Data Management</h3>
                 </div>
                 <div className="p-8 space-y-6">
                     <p className="text-sm text-slate-600 mb-4">Export the current system configuration (Connectors, Rules, Users, etc.) to a JSON file for backup or version control. Import to restore state.</p>
@@ -451,28 +510,28 @@ export const Settings = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div 
                                 onClick={() => updateLLMConfig('mode', 'direct')}
-                                className={`cursor-pointer border-2 rounded-xl p-5 transition-all relative overflow-hidden ${settings.llmConfig.mode === 'direct' ? 'border-blue-500 bg-blue-50/50 shadow-md' : 'border-transparent bg-white/50 hover:bg-white/70 hover:shadow-sm'}`}
+                                className={`cursor-pointer border-2 rounded-xl p-5 transition-all relative overflow-hidden ${safeSettings.llmConfig.mode === 'direct' ? 'border-blue-500 bg-blue-50/50 shadow-md' : 'border-transparent bg-white/50 hover:bg-white/70 hover:shadow-sm'}`}
                             >
                                 <div className="flex items-center justify-between mb-2 relative z-10">
                                     <span className="font-bold text-slate-900">Direct API (SDK)</span>
-                                    {settings.llmConfig.mode === 'direct' && <div className="w-3 h-3 rounded-full bg-blue-600 shadow-sm"></div>}
+                                    {safeSettings.llmConfig.mode === 'direct' && <div className="w-3 h-3 rounded-full bg-blue-600 shadow-sm"></div>}
                                 </div>
                                 <p className="text-xs text-slate-500 leading-relaxed relative z-10">Connects directly to Gemini API via Client SDK. Best for development and demos.</p>
                             </div>
                             <div 
                                 onClick={() => updateLLMConfig('mode', 'gcp_agent')}
-                                className={`cursor-pointer border-2 rounded-xl p-5 transition-all relative overflow-hidden ${settings.llmConfig.mode === 'gcp_agent' ? 'border-blue-500 bg-blue-50/50 shadow-md' : 'border-transparent bg-white/50 hover:bg-white/70 hover:shadow-sm'}`}
+                                className={`cursor-pointer border-2 rounded-xl p-5 transition-all relative overflow-hidden ${safeSettings.llmConfig.mode === 'gcp_agent' ? 'border-blue-500 bg-blue-50/50 shadow-md' : 'border-transparent bg-white/50 hover:bg-white/70 hover:shadow-sm'}`}
                             >
                                 <div className="flex items-center justify-between mb-2 relative z-10">
                                     <span className="font-bold text-slate-900">GCP Agent (Deployed)</span>
-                                    {settings.llmConfig.mode === 'gcp_agent' && <div className="w-3 h-3 rounded-full bg-blue-600 shadow-sm"></div>}
+                                    {safeSettings.llmConfig.mode === 'gcp_agent' && <div className="w-3 h-3 rounded-full bg-blue-600 shadow-sm"></div>}
                                 </div>
                                 <p className="text-xs text-slate-500 leading-relaxed relative z-10">Proxies requests through a managed Google Cloud Agent endpoint. Enforces server-side policies and tracing.</p>
                             </div>
                         </div>
                     </div>
 
-                    {settings.llmConfig.mode === 'gcp_agent' && (
+                    {safeSettings.llmConfig.mode === 'gcp_agent' && (
                         <div className="space-y-6 pt-6 border-t border-white/40 animate-in fade-in slide-in-from-top-2">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="col-span-2">
@@ -481,7 +540,7 @@ export const Settings = () => {
                                         <Globe className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
                                         <input 
                                             type="text" 
-                                            value={settings.llmConfig.agentEndpoint}
+                                            value={safeSettings.llmConfig.agentEndpoint}
                                             onChange={(e) => updateLLMConfig('agentEndpoint', e.target.value)}
                                             placeholder="https://my-agent-service-xyz.a.run.app/v1/query"
                                             className="w-full pl-10 pr-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none transition-shadow"
@@ -492,7 +551,7 @@ export const Settings = () => {
                                     <label className="block text-sm font-semibold text-slate-700 mb-2">Agent Location</label>
                                     <input 
                                         type="text" 
-                                        value={settings.llmConfig.location}
+                                        value={safeSettings.llmConfig.location}
                                         onChange={(e) => updateLLMConfig('location', e.target.value)}
                                         placeholder="us-central1"
                                         className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none transition-shadow"
@@ -502,7 +561,7 @@ export const Settings = () => {
                                     <label className="block text-sm font-semibold text-slate-700 mb-2">Auth Token (Optional)</label>
                                     <input 
                                         type="password" 
-                                        value={settings.llmConfig.agentAuthToken || ''}
+                                        value={safeSettings.llmConfig.agentAuthToken || ''}
                                         onChange={(e) => updateLLMConfig('agentAuthToken', e.target.value)}
                                         placeholder="Service Account Token"
                                         className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none transition-shadow"
@@ -535,7 +594,7 @@ export const Settings = () => {
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-2">Trace Provider</label>
                             <select 
-                                value={settings.tracingConfig.provider}
+                                value={safeSettings.tracingConfig.provider}
                                 onChange={(e) => updateTracingConfig('provider', e.target.value)}
                                 className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none transition-shadow"
                             >
@@ -547,7 +606,7 @@ export const Settings = () => {
                             <label className="block text-sm font-semibold text-slate-700 mb-2">Google Project ID</label>
                             <input 
                                 type="text" 
-                                value={settings.tracingConfig.projectId || ''}
+                                value={safeSettings.tracingConfig.projectId || ''}
                                 onChange={(e) => updateTracingConfig('projectId', e.target.value)}
                                 placeholder="my-gcp-project-id"
                                 className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none transition-shadow"
@@ -560,7 +619,7 @@ export const Settings = () => {
                                 min="0"
                                 max="1"
                                 step="0.1"
-                                value={settings.tracingConfig.sampleRate}
+                                value={safeSettings.tracingConfig.sampleRate}
                                 onChange={(e) => updateTracingConfig('sampleRate', parseFloat(e.target.value))}
                                 className="w-full px-4 py-2.5 bg-white/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none transition-shadow"
                             />

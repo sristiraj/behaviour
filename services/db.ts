@@ -8,10 +8,14 @@ declare global {
     }
 }
 
+type StorageMode = 'local' | 'remote';
+
 class DatabaseService {
     private db: any = null;
     private initialized: boolean = false;
     private initPromise: Promise<void> | null = null;
+    private mode: StorageMode = 'local';
+    private apiBaseUrl: string = 'http://localhost:8000/api';
 
     constructor() {
         this.initPromise = this.init();
@@ -20,48 +24,66 @@ class DatabaseService {
     async init() {
         if (this.initialized) return;
 
+        // Load preferred mode
         try {
-            console.log("Initializing SQLite...");
+            const savedMode = await window.localforage.getItem('behaviour_storage_mode');
+            if (savedMode) this.mode = savedMode as StorageMode;
+            
+            const savedUrl = await window.localforage.getItem('behaviour_api_url');
+            if (savedUrl) this.apiBaseUrl = savedUrl;
+        } catch (e) {
+            console.warn("Could not load storage preference", e);
+        }
+
+        if (this.mode === 'local') {
+            await this.initLocalDb();
+        } else {
+            console.log(`Initialized in Remote API mode: ${this.apiBaseUrl}`);
+            // Check connectivity
+            try {
+                 await fetch(`${this.apiBaseUrl}/hcps`);
+            } catch (e) {
+                console.warn("Backend seems down. Consider switching to Local mode in Settings.");
+            }
+        }
+
+        this.initialized = true;
+    }
+
+    private async initLocalDb() {
+        try {
+            console.log("Initializing SQLite (Local)...");
             const SQL = await window.initSqlJs({
                 locateFile: (file: string) => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}`
             });
 
-            // Try loading from IndexedDB
             const savedDb = await window.localforage.getItem('behaviour_sqlite_db');
             
             if (savedDb) {
                 this.db = new SQL.Database(new Uint8Array(savedDb));
                 console.log("Loaded database from persistence.");
-                
-                // DATA MIGRATION CHECK:
-                // Check if 'hcps' table has 'id' column. If not (it has 'npi'), we need to rebuild the DB.
+                // Schema check logic
                 try {
                    this.db.exec("SELECT id FROM hcps LIMIT 1");
                 } catch (e) {
-                   console.warn("Detected old schema (hcps missing 'id' column). Re-seeding database.");
-                   this.db = new SQL.Database(); // Reset to new in-memory DB
+                   console.warn("Detected old schema. Re-seeding database.");
+                   this.db = new SQL.Database();
                    this.seedDatabase();
                 }
-
             } else {
                 this.db = new SQL.Database();
                 console.log("Created new in-memory database.");
                 this.seedDatabase();
             }
 
-            this.initialized = true;
-            // Auto-save on window unload
             window.addEventListener('beforeunload', () => this.saveToDisk());
         } catch (err) {
             console.error("Failed to initialize SQLite:", err);
-            // Fallback: create fresh in-memory if loading failed
+            // Fallback attempt
             try {
-                const SQL = await window.initSqlJs({
-                     locateFile: (file: string) => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}`
-                });
+                const SQL = await window.initSqlJs({ locateFile: (file: string) => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}`});
                 this.db = new SQL.Database();
                 this.seedDatabase();
-                this.initialized = true;
             } catch (fallbackErr) {
                 console.error("Critical Failure: Could not initialize SQLite fallback", fallbackErr);
             }
@@ -69,11 +91,9 @@ class DatabaseService {
     }
 
     private seedDatabase() {
-        // Drop tables if they exist to ensure clean schema (generic 'id' column)
         const tableNames = ['users', 'groups', 'connectors', 'hcps', 'rules', 'settings', 'attributes', 'links'];
         tableNames.forEach(t => this.db.run(`DROP TABLE IF EXISTS ${t}`));
 
-        // Create tables - ALL using 'id' as primary key column for consistency
         const tables = [
             `CREATE TABLE users (id TEXT PRIMARY KEY, data TEXT);`,
             `CREATE TABLE groups (id TEXT PRIMARY KEY, data TEXT);`,
@@ -87,47 +107,60 @@ class DatabaseService {
 
         tables.forEach(sql => this.db.run(sql));
 
-        // Seed default data if empty (using MOCK data as seed)
-        this.bulkInsert('users', MOCK_USERS);
-        this.bulkInsert('groups', MOCK_GROUPS);
-        this.bulkInsert('connectors', MOCK_CONNECTORS);
-        // Map NPI to ID
-        this.bulkInsert('hcps', MOCK_HCPS.map(h => ({ ...h, id: h.npi }))); 
-        this.bulkInsert('rules', MOCK_RULES);
-        // Map Key to ID
-        this.bulkInsert('attributes', DEFAULT_ATTRIBUTES.map(a => ({ ...a, id: a.key })));
+        this.bulkInsertLocal('users', MOCK_USERS);
+        this.bulkInsertLocal('groups', MOCK_GROUPS);
+        this.bulkInsertLocal('connectors', MOCK_CONNECTORS);
+        this.bulkInsertLocal('hcps', MOCK_HCPS.map(h => ({ ...h, id: h.npi }))); 
+        this.bulkInsertLocal('rules', MOCK_RULES);
+        this.bulkInsertLocal('attributes', DEFAULT_ATTRIBUTES.map(a => ({ ...a, id: a.key })));
         
-        // Settings
         const defaultSettings = {
             llmConfig: { mode: 'direct', agentEndpoint: '', location: 'us-central1' },
             tracingConfig: { provider: 'none', sampleRate: 1.0 }
         };
-        this.upsert('settings', { id: 'system_settings', ...defaultSettings });
+        this.upsertLocal('settings', { id: 'system_settings', ...defaultSettings });
 
         this.saveToDisk();
     }
 
+    // --- Configuration Methods ---
+
+    async setMode(mode: StorageMode, apiUrl?: string) {
+        this.mode = mode;
+        if (apiUrl) this.apiBaseUrl = apiUrl;
+        
+        await window.localforage.setItem('behaviour_storage_mode', mode);
+        if (apiUrl) await window.localforage.setItem('behaviour_api_url', apiUrl);
+
+        if (mode === 'local' && !this.db) {
+            await this.initLocalDb();
+        }
+        
+        window.location.reload(); 
+    }
+
+    getMode() { return this.mode; }
+    getApiUrl() { return this.apiBaseUrl; }
+
     // --- Core Operations ---
 
     async saveToDisk() {
-        if (!this.db) return;
-        try {
-            const data = this.db.export();
-            await window.localforage.setItem('behaviour_sqlite_db', data);
-        } catch (e) {
-            console.warn("Failed to save DB to disk", e);
+        if (this.mode === 'local' && this.db) {
+            try {
+                const data = this.db.export();
+                await window.localforage.setItem('behaviour_sqlite_db', data);
+            } catch (e) {
+                console.warn("Failed to save DB to disk", e);
+            }
         }
     }
 
-    private bulkInsert(table: string, items: any[]) {
+    private bulkInsertLocal(table: string, items: any[]) {
         try {
             const stmt = this.db.prepare(`INSERT OR IGNORE INTO ${table} (id, data) VALUES (?, ?)`);
             for (const item of items) {
-                // Normalize ID: prefer 'id', fallback to 'npi' or 'key'
                 const id = item.id || item.npi || item.key;
-                if (id) {
-                    stmt.run([id, JSON.stringify(item)]);
-                }
+                if (id) stmt.run([id, JSON.stringify(item)]);
             }
             stmt.free();
         } catch (e) {
@@ -135,77 +168,112 @@ class DatabaseService {
         }
     }
 
+    private upsertLocal(table: string, item: any) {
+        const id = item.id || item.npi || item.key;
+        if (!id) return;
+        this.db.run(`INSERT OR REPLACE INTO ${table} (id, data) VALUES (?, ?)`, [id, JSON.stringify(item)]);
+        this.saveToDisk();
+    }
+
     async getAll(table: string): Promise<any[]> {
         await this.initPromise;
-        if (!this.db) return [];
-        try {
-            const result = this.db.exec(`SELECT data FROM ${table}`);
-            if (!result.length) return [];
-            return result[0].values.map((v: any[]) => JSON.parse(v[0]));
-        } catch (e) {
-            console.error(`Error fetching from ${table}:`, e);
-            return [];
+
+        if (this.mode === 'remote') {
+            try {
+                const res = await fetch(`${this.apiBaseUrl}/${table}`);
+                if (!res.ok) throw new Error(`API Error: ${res.statusText}`);
+                return await res.json();
+            } catch (e) {
+                console.error(`Failed to fetch ${table} from remote`, e);
+                return [];
+            }
+        } else {
+            // Local WASM
+            if (!this.db) return [];
+            try {
+                const result = this.db.exec(`SELECT data FROM ${table}`);
+                if (!result.length) return [];
+                return result[0].values.map((v: any[]) => JSON.parse(v[0]));
+            } catch (e) {
+                console.error(`Error fetching from ${table}:`, e);
+                return [];
+            }
         }
     }
 
     async getById(table: string, id: string): Promise<any | null> {
         await this.initPromise;
-        if (!this.db) return null;
-        try {
-            const stmt = this.db.prepare(`SELECT data FROM ${table} WHERE id = ?`);
-            stmt.bind([id]);
-            if (stmt.step()) {
-                const data = JSON.parse(stmt.get()[0]);
-                stmt.free();
-                return data;
+
+        if (this.mode === 'remote') {
+            try {
+                const res = await fetch(`${this.apiBaseUrl}/${table}/${id}`);
+                if (res.status === 404) return null;
+                if (!res.ok) throw new Error("API Error");
+                return await res.json();
+            } catch (e) {
+                return null;
             }
-            stmt.free();
-            return null;
-        } catch (e) {
-            console.error(`Error fetching by id from ${table}:`, e);
-            return null;
+        } else {
+            if (!this.db) return null;
+            try {
+                const stmt = this.db.prepare(`SELECT data FROM ${table} WHERE id = ?`);
+                stmt.bind([id]);
+                if (stmt.step()) {
+                    const data = JSON.parse(stmt.get()[0]);
+                    stmt.free();
+                    return data;
+                }
+                stmt.free();
+                return null;
+            } catch (e) {
+                return null;
+            }
         }
     }
 
     async upsert(table: string, item: any) {
         await this.initPromise;
-        if (!this.db) return;
-        try {
-            // Normalize ID
-            const id = item.id || item.npi || item.key;
-            if (!id) {
-                console.error("Cannot upsert item without id/npi/key", item);
-                return;
+        const id = item.id || item.npi || item.key;
+        if (!id) {
+            console.error("Upsert failed: Item missing ID/NPI/Key", item);
+            return;
+        }
+
+        if (this.mode === 'remote') {
+            try {
+                // Ensure ID is explicit in body for consistency, though backend can extract from npi/key
+                const payload = { ...item };
+                await fetch(`${this.apiBaseUrl}/${table}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+            } catch (e) {
+                console.error(`Failed to upsert to remote`, e);
+                throw e; 
             }
-            
-            // Ensure the item stored in JSON also has the normalized ID property if needed, 
-            // but usually keeping the original object structure is preferred.
-            // We just use 'id' column for lookup.
-            
-            this.db.run(`INSERT OR REPLACE INTO ${table} (id, data) VALUES (?, ?)`, [id, JSON.stringify(item)]);
-            this.saveToDisk();
-        } catch (e) {
-            console.error(`Error upserting into ${table}:`, e);
+        } else {
+            this.upsertLocal(table, item);
         }
     }
 
     async delete(table: string, id: string) {
         await this.initPromise;
-        if (!this.db) return;
-        try {
+        if (this.mode === 'remote') {
+            try {
+                await fetch(`${this.apiBaseUrl}/${table}/${id}`, { method: 'DELETE' });
+            } catch (e) {
+                console.error(`Failed to delete remote`, e);
+            }
+        } else {
+            if (!this.db) return;
             this.db.run(`DELETE FROM ${table} WHERE id = ?`, [id]);
             this.saveToDisk();
-        } catch (e) {
-            console.error(`Error deleting from ${table}:`, e);
         }
     }
 
-    // --- Import / Export ---
-
     async exportFullState(): Promise<string> {
         await this.initPromise;
-        if (!this.db) return "{}";
-        
         const tables = ['users', 'groups', 'connectors', 'hcps', 'rules', 'settings', 'attributes', 'links'];
         const dump: Record<string, any[]> = {};
         
@@ -217,34 +285,39 @@ class DatabaseService {
 
     async importFullState(json: string): Promise<void> {
         await this.initPromise;
-        if (!this.db) return;
+        const dump = JSON.parse(json);
+        const tables = ['users', 'groups', 'connectors', 'hcps', 'rules', 'settings', 'attributes', 'links'];
 
-        try {
-            const dump = JSON.parse(json);
-            const tables = ['users', 'groups', 'connectors', 'hcps', 'rules', 'settings', 'attributes', 'links'];
-            
-            // Transactional update
-            this.db.run("BEGIN TRANSACTION");
-            
-            for (const table of tables) {
-                if (Array.isArray(dump[table])) {
-                    this.db.run(`DELETE FROM ${table}`);
-                    const stmt = this.db.prepare(`INSERT INTO ${table} (id, data) VALUES (?, ?)`);
-                    for (const item of dump[table]) {
-                        const id = item.id || item.npi || item.key;
-                        if (id) stmt.run([id, JSON.stringify(item)]);
+        if (this.mode === 'remote') {
+             for (const table of tables) {
+                 if (Array.isArray(dump[table])) {
+                     for (const item of dump[table]) {
+                         await this.upsert(table, item);
+                     }
+                 }
+             }
+        } else {
+            // Local Transactional
+            if (!this.db) return;
+            try {
+                this.db.run("BEGIN TRANSACTION");
+                for (const table of tables) {
+                    if (Array.isArray(dump[table])) {
+                        this.db.run(`DELETE FROM ${table}`);
+                        const stmt = this.db.prepare(`INSERT INTO ${table} (id, data) VALUES (?, ?)`);
+                        for (const item of dump[table]) {
+                            const id = item.id || item.npi || item.key;
+                            if (id) stmt.run([id, JSON.stringify(item)]);
+                        }
+                        stmt.free();
                     }
-                    stmt.free();
                 }
+                this.db.run("COMMIT");
+                this.saveToDisk();
+            } catch (e) {
+                this.db.run("ROLLBACK");
+                throw e;
             }
-            
-            this.db.run("COMMIT");
-            this.saveToDisk();
-            console.log("Database imported successfully.");
-        } catch (e) {
-            this.db.run("ROLLBACK");
-            console.error("Import failed", e);
-            throw e;
         }
     }
 }

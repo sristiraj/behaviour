@@ -1,11 +1,6 @@
-import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { HCP, SegmentationResult } from "../types";
 import { getSystemSettings } from "./settingsService";
-
-const apiKey = process.env.API_KEY || ""; 
-const ai = new GoogleGenAI({ apiKey });
-
-export const getGeminiClient = () => ai;
+import { dbService } from "./db";
 
 export const DEFAULT_NLQ_INSTRUCTION = `You are an expert commercial analytics agent for a pharmaceutical company. 
 You have access to a list of HCPs (Healthcare Professionals) and their qualitative segmentation data.
@@ -15,14 +10,9 @@ Your goals:
 2. Perform "What-If" analysis on segmentation rules.
 3. Explain the rationale behind specific personas.`;
 
-const generateTraceHeader = (projectId?: string) => {
-    const traceId = Array.from({length: 32}, () => Math.floor(Math.random() * 16).toString(16)).join('');
-    const spanId = Math.floor(Math.random() * 10000000000000000).toString();
-    return `${traceId}/${spanId};o=1`;
-};
-
 /**
  * Simulates the "What-If" or NLQ analysis on an HCP profile.
+ * Now delegated to Python Backend.
  */
 export const runNLQAnalysis = async (
   query: string,
@@ -30,156 +20,81 @@ export const runNLQAnalysis = async (
   conversationHistory: string[] = [],
   instructionOverride?: string
 ): Promise<string> => {
-  // Now async
   const settings = await getSystemSettings();
-
-  // GCP Agent Mode
-  if (settings.llmConfig.mode === 'gcp_agent') {
-      if (!settings.llmConfig.agentEndpoint) {
-          return "Configuration Error: GCP Agent Endpoint is missing in System Settings.";
-      }
-
-      try {
-          const headers: Record<string, string> = {
-              'Content-Type': 'application/json',
-          };
-
-          if (settings.llmConfig.agentAuthToken) {
-              headers['Authorization'] = `Bearer ${settings.llmConfig.agentAuthToken}`;
-          }
-
-          if (settings.tracingConfig.provider === 'google_cloud_trace') {
-              headers['X-Cloud-Trace-Context'] = generateTraceHeader(settings.tracingConfig.projectId);
-              if (settings.tracingConfig.projectId) {
-                  headers['X-GCP-Project-ID'] = settings.tracingConfig.projectId;
-              }
-          }
-
-          console.log(`[GCP Agent] Calling ${settings.llmConfig.agentEndpoint}`);
-          
-          if (settings.llmConfig.agentEndpoint === 'error') throw new Error("Simulated Agent Error");
-
-          await new Promise(resolve => setTimeout(resolve, 1500));
-
-          return `[GCP Agent Response] Processed by ${settings.tracingConfig.provider === 'google_cloud_trace' ? 'Trace-Enabled ' : ''}Agent at ${settings.llmConfig.location || 'GCP'}.\n\nBased on the analysis of the provided HCP context, the agent confirms: "${query}" matches profiles in the dataset.`;
-      } catch (error) {
-          console.error("GCP Agent Error:", error);
-          return "Error communicating with the GCP Agent. Please check your System Settings and network connection.";
-      }
-  }
-
-  // Direct Mode (Fallback)
-  if (!apiKey) {
-    return "API Key is missing. Running in Demo Mode. \n\n(Mock Response): Based on the query, we found 3 HCPs matching 'RWE-focused' in the NY area. Changing the engagement strategy to 'Virtual' usually increases engagement scores by 15% for this segment.";
-  }
+  const apiBase = dbService.getApiUrl();
+  const instruction = instructionOverride || DEFAULT_NLQ_INSTRUCTION;
 
   try {
-    const model = "gemini-2.5-flash";
-    const baseInstruction = instructionOverride || DEFAULT_NLQ_INSTRUCTION;
-    const systemInstruction = `${baseInstruction}
-
-    HCP Data Context:
-    ${JSON.stringify(currentContext.slice(0, 5))} // Limiting context for demo
-    `;
-
-    const response = await ai.models.generateContent({
-      model,
-      contents: [
-        ...conversationHistory.map(text => ({ role: "user", parts: [{ text }] })),
-        { role: "user", parts: [{ text: query }] }
-      ],
-      config: {
-        systemInstruction,
-        temperature: 0.4,
-      }
+    const response = await fetch(`${apiBase}/nlq`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            query,
+            history: conversationHistory,
+            instruction,
+            context_data: currentContext.slice(0, 10) // Send subset to backend
+        })
     });
 
-    return response.text || "I couldn't generate a response.";
+    if (!response.ok) {
+         throw new Error(`Backend Error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.response || "No response text received.";
+
   } catch (error) {
-    console.error("NLQ Error:", error);
-    return "Error connecting to the intelligence engine. Please check your API key.";
+    console.error("NLQ Error (Backend):", error);
+    // Fallback Mock
+    return "Error connecting to the intelligence engine (Backend). Please ensure the FastAPI backend is running on port 8000.\n\n(Mock): Based on the query, we found matching profiles.";
   }
 };
 
 /**
  * Simulates running a segmentation rule on a specific HCP.
+ * Now delegated to Python Backend.
  */
 export const runSegmentationPreview = async (
   hcp: HCP,
   ruleInstruction: string,
   ruleContext?: string
 ): Promise<SegmentationResult> => {
-  const settings = await getSystemSettings();
-
-   if (settings.llmConfig.mode === 'gcp_agent') {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        return {
-            persona: "GCP Agent Segmented",
-            influence: "High",
-            engagement_readiness: "Warm",
-            channel_preference: "Virtual",
-            confidence: 0.99,
-            key_drivers: ["Agent Logic 1", "Agent Logic 2"],
-            recommended_next_action: "Agent Recommended Action",
-            rationale: `Processed by GCP Agent at ${settings.llmConfig.agentEndpoint} with active tracing.`,
-            run_date: new Date().toISOString()
-        };
-   }
-
-  if (!apiKey) {
-    return {
-      persona: "RWE-focused (Preview)",
-      influence: "High",
-      engagement_readiness: "Warm",
-      channel_preference: "Email",
-      confidence: 0.85,
-      key_drivers: ["Mock driver 1", "Mock driver 2"],
-      recommended_next_action: "Mock Action",
-      rationale: "This is a mock rationale generated without an API key.",
-      run_date: new Date().toISOString()
-    };
-  }
-
+  const apiBase = dbService.getApiUrl();
+  
   try {
-    const responseSchema: Schema = {
-      type: Type.OBJECT,
-      properties: {
-        persona: { type: Type.STRING },
-        influence: { type: Type.STRING, enum: ["High", "Medium", "Low"] },
-        engagement_readiness: { type: Type.STRING, enum: ["Hot", "Warm", "Cold"] },
-        channel_preference: { type: Type.STRING, enum: ["In-person", "Virtual", "Email"] },
-        confidence: { type: Type.NUMBER },
-        key_drivers: { type: Type.ARRAY, items: { type: Type.STRING } },
-        recommended_next_action: { type: Type.STRING },
-        rationale: { type: Type.STRING },
-      },
-      required: ["persona", "influence", "engagement_readiness", "confidence", "key_drivers", "rationale"]
-    };
-
-    const promptContext = ruleContext ? `Additional Context: ${ruleContext}\n\n` : '';
-    const contents = `Analyze this HCP profile based on the following instruction: "${ruleInstruction}". \n\n ${promptContext}Profile: ${JSON.stringify(hcp)}`;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: contents,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: responseSchema,
-        temperature: 0.2
-      }
+    const response = await fetch(`${apiBase}/segmentation/preview`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            hcp,
+            instruction: ruleInstruction,
+            context: ruleContext
+        })
     });
 
-    const text = response.text;
-    if (!text) throw new Error("No response from model");
+    if (!response.ok) {
+         throw new Error(`Backend Error: ${response.statusText}`);
+    }
 
-    const result = JSON.parse(text);
+    const result = await response.json();
     return {
       ...result,
       run_date: new Date().toISOString()
     };
 
   } catch (error) {
-    console.error("Segmentation Error:", error);
-    throw error;
+    console.error("Segmentation Error (Backend):", error);
+    // Return mock if backend fails to allow UI testing
+    return {
+      persona: "Error (Backend unavailable)",
+      influence: "Low",
+      engagement_readiness: "Cold",
+      channel_preference: "Email",
+      confidence: 0.0,
+      key_drivers: ["Backend connection failed"],
+      recommended_next_action: "Check console logs",
+      rationale: "Could not reach FastAPI backend.",
+      run_date: new Date().toISOString()
+    };
   }
 };
