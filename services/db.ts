@@ -1,3 +1,4 @@
+
 import { MOCK_USERS, MOCK_GROUPS, MOCK_CONNECTORS, MOCK_HCPS, MOCK_RULES, DEFAULT_ATTRIBUTES } from "../constants";
 
 // Types for global libraries loaded via CDN
@@ -14,7 +15,8 @@ class DatabaseService {
     private db: any = null;
     private initialized: boolean = false;
     private initPromise: Promise<void> | null = null;
-    private mode: StorageMode = 'local';
+    // UPDATED: Default to remote to use the FastAPI backend
+    private mode: StorageMode = 'remote';
     private apiBaseUrl: string = 'http://localhost:8000/api';
 
     constructor() {
@@ -39,11 +41,16 @@ class DatabaseService {
             await this.initLocalDb();
         } else {
             console.log(`Initialized in Remote API mode: ${this.apiBaseUrl}`);
-            // Check connectivity
             try {
-                 await fetch(`${this.apiBaseUrl}/hcps`);
+                 // Check connectivity by fetching users
+                 const users = await this.getAll('users');
+                 // If remote is empty (fresh server), seed it with mocks for a better DX
+                 if (users.length === 0) {
+                     console.log("Remote DB appears empty. Seeding default data...");
+                     await this.seedRemote();
+                 }
             } catch (e) {
-                console.warn("Backend seems down. Consider switching to Local mode in Settings.");
+                console.warn("Backend connection failed. Please ensure 'backend/main.py' is running on port 8000.");
             }
         }
 
@@ -62,35 +69,34 @@ class DatabaseService {
             if (savedDb) {
                 this.db = new SQL.Database(new Uint8Array(savedDb));
                 console.log("Loaded database from persistence.");
-                // Schema check logic
                 try {
                    this.db.exec("SELECT id FROM hcps LIMIT 1");
                 } catch (e) {
                    console.warn("Detected old schema. Re-seeding database.");
                    this.db = new SQL.Database();
-                   this.seedDatabase();
+                   this.seedLocalDatabase();
                 }
             } else {
                 this.db = new SQL.Database();
                 console.log("Created new in-memory database.");
-                this.seedDatabase();
+                this.seedLocalDatabase();
             }
 
             window.addEventListener('beforeunload', () => this.saveToDisk());
         } catch (err) {
             console.error("Failed to initialize SQLite:", err);
-            // Fallback attempt
             try {
+                // Retry fallback
                 const SQL = await window.initSqlJs({ locateFile: (file: string) => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}`});
                 this.db = new SQL.Database();
-                this.seedDatabase();
+                this.seedLocalDatabase();
             } catch (fallbackErr) {
                 console.error("Critical Failure: Could not initialize SQLite fallback", fallbackErr);
             }
         }
     }
 
-    private seedDatabase() {
+    private seedLocalDatabase() {
         const tableNames = ['users', 'groups', 'connectors', 'hcps', 'rules', 'settings', 'attributes', 'links'];
         tableNames.forEach(t => this.db.run(`DROP TABLE IF EXISTS ${t}`));
 
@@ -121,6 +127,23 @@ class DatabaseService {
         this.upsertLocal('settings', { id: 'system_settings', ...defaultSettings });
 
         this.saveToDisk();
+    }
+
+    private async seedRemote() {
+        // Sequentially upsert mocks to backend to avoid overwhelming parallel requests
+        for (const u of MOCK_USERS) await this.upsert('users', u);
+        for (const g of MOCK_GROUPS) await this.upsert('groups', g);
+        for (const c of MOCK_CONNECTORS) await this.upsert('connectors', c);
+        for (const h of MOCK_HCPS) await this.upsert('hcps', { ...h, id: h.npi });
+        for (const r of MOCK_RULES) await this.upsert('rules', r);
+        for (const a of DEFAULT_ATTRIBUTES) await this.upsert('attributes', { ...a, id: a.key });
+        
+        const defaultSettings = {
+            llmConfig: { mode: 'direct', agentEndpoint: '', location: 'us-central1' },
+            tracingConfig: { provider: 'none', sampleRate: 1.0 }
+        };
+        await this.upsert('settings', { id: 'system_settings', ...defaultSettings });
+        console.log("Remote seeding complete.");
     }
 
     // --- Configuration Methods ---
@@ -185,6 +208,7 @@ class DatabaseService {
                 return await res.json();
             } catch (e) {
                 console.error(`Failed to fetch ${table} from remote`, e);
+                // Return empty array to prevent UI crash, but log error
                 return [];
             }
         } else {
@@ -241,7 +265,7 @@ class DatabaseService {
 
         if (this.mode === 'remote') {
             try {
-                // Ensure ID is explicit in body for consistency, though backend can extract from npi/key
+                // Ensure ID is explicit in body for consistency
                 const payload = { ...item };
                 await fetch(`${this.apiBaseUrl}/${table}`, {
                     method: 'POST',
